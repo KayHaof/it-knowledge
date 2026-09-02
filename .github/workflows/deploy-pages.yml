@@ -32,14 +32,16 @@ jobs:
       - name: Use project npm version
         run: npm install --global npm@11.4.0
 
-      - name: Show environment versions
+      - name: Show Node and npm versions
         run: |
           node --version
           npm --version
-          npx ng version
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Show Angular version
+        run: npx ng version
 
       - name: Lint
         run: npm run lint
