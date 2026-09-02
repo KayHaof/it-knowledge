@@ -7,6 +7,8 @@ const contentRoot = path.join(root, 'content');
 const outputRoot = path.join(root, 'public', 'generated');
 const required = ['id','slug','title','description','category','technology','level','estimatedMinutes','tags','prerequisites','learningObjectives','lastReviewed','sources'];
 const levels = new Set(['beginner','intermediate','advanced','senior']);
+const interviewDifficulties = new Set(['beginner','junior','middle','senior','system-design']);
+const interviewCategories = new Set(['Java','Spring','JPA/Hibernate','SQL','PostgreSQL','MySQL','Oracle','Redis','Kafka','Microservices','Distributed Systems','WebSocket','Networking','Security','Kubernetes','System Design','Angular','MongoDB','Docker','CI/CD','Observability','Performance','Architecture','Testing','Project Experience','Engineering Fundamentals']);
 const sourceTypes = new Set(['official-documentation','official-api-reference','specification','standard','internet-standard','best-current-practice','primary-vendor','primary-vendor-guidance','primary-vendor-whitepaper','security-guidance','secondary']);
 
 export function parseFrontmatter(source) {
@@ -125,11 +127,18 @@ async function loadLessons() {
 
 async function validateSupplemental(lessonIds, lessonPaths, errors, domains) {
   try {
-    const questions=JSON.parse(await fs.readFile(path.join(contentRoot,'interview','questions.json'),'utf8'));
+    const questions=await loadInterviewQuestions();
     const seen=new Set();
+    const questionTexts=new Set();
     for(const question of questions){
       for(const field of ['id','category','difficulty','question','answer30s','answer2m','production','wrongAnswer','followUps','relatedLesson']) if(!question[field])errors.push(`interview ${question.id??'?'}: thiếu ${field}`);
       if(seen.has(question.id))errors.push(`interview duplicate id: ${question.id}`);seen.add(question.id);
+      if(!interviewCategories.has(question.category))errors.push(`interview ${question.id??'?'}: category không hợp lệ ${question.category}`);
+      if(!interviewDifficulties.has(question.difficulty))errors.push(`interview ${question.id??'?'}: difficulty không hợp lệ ${question.difficulty}`);
+      if(!Array.isArray(question.topics)||!question.topics.length)errors.push(`interview ${question.id??'?'}: topics phải là mảng không rỗng`);
+      if(!Array.isArray(question.followUps)||question.followUps.length<2||question.followUps.length>5)errors.push(`interview ${question.id??'?'}: followUps phải có 2-5 câu`);
+      const questionText=String(question.question??'').trim().toLocaleLowerCase();
+      if(questionTexts.has(questionText))errors.push(`interview duplicate question: ${question.id}`);questionTexts.add(questionText);
       if(question.relatedLesson&&!lessonPaths.has(question.relatedLesson))errors.push(`interview ${question.id}: relatedLesson không tồn tại ${question.relatedLesson}`);
       if(question.sources!==undefined&&!Array.isArray(question.sources))errors.push(`interview ${question.id}: sources phải là mảng`);
       for(const source of question.sources??[]){
@@ -139,7 +148,7 @@ async function validateSupplemental(lessonIds, lessonPaths, errors, domains) {
         if(source.type&&!sourceTypes.has(source.type))errors.push(`interview ${question.id}: source type không hợp lệ ${source.type}`);
       }
     }
-  }catch(error){errors.push(`content/interview/questions.json: ${error instanceof Error?error.message:String(error)}`);}
+  }catch(error){errors.push(`content/interview/*.json: ${error instanceof Error?error.message:String(error)}`);}
   try {
     const roadmaps=JSON.parse(await fs.readFile(path.join(contentRoot,'roadmaps.json'),'utf8')); const seen=new Set();
     for(const roadmap of roadmaps){
@@ -150,12 +159,24 @@ async function validateSupplemental(lessonIds, lessonPaths, errors, domains) {
   }catch(error){errors.push(`content/roadmaps.json: ${error instanceof Error?error.message:String(error)}`);}
 }
 
+async function loadInterviewQuestions() {
+  const interviewRoot=path.join(contentRoot,'interview');
+  const files=(await fs.readdir(interviewRoot,{withFileTypes:true})).filter((entry)=>entry.isFile()&&entry.name.endsWith('.json')).map((entry)=>entry.name).sort();
+  const questions=[];
+  for(const file of files){
+    const parsed=JSON.parse(await fs.readFile(path.join(interviewRoot,file),'utf8'));
+    if(!Array.isArray(parsed))throw new Error(`${file}: interview data phải là mảng`);
+    questions.push(...parsed);
+  }
+  return questions;
+}
+
 async function build() {
   const lessons=await loadLessons(); await fs.mkdir(outputRoot,{recursive:true});
   await fs.writeFile(path.join(outputRoot,'lessons.json'),JSON.stringify(lessons));
   const index=lessons.map(({id,slug,title,description,category,technology,level,tags,headings,searchText,path})=>({id,slug,title,description,category,technology,level,tags,headings:headings.map((heading)=>heading.text),content:searchText,path}));
   await fs.writeFile(path.join(outputRoot,'search-index.json'),JSON.stringify(index));
-  const questions=JSON.parse(await fs.readFile(path.join(contentRoot,'interview','questions.json'),'utf8'));
+  const questions=await loadInterviewQuestions();
   const lessonByPath=new Map(lessons.map((lesson)=>[lesson.path,lesson]));
   const sourcedQuestions=questions.map((question)=>({
     ...question,
@@ -168,7 +189,7 @@ async function build() {
 
 async function checkLinks() {
   const lessons=await loadLessons();
-  const questions=JSON.parse(await fs.readFile(path.join(contentRoot,'interview','questions.json'),'utf8'));
+  const questions=await loadInterviewQuestions();
   const urls=[...new Set([
     ...lessons.flatMap((item)=>item.sources.map((source)=>source.url)),
     ...questions.flatMap((item)=>(item.sources??[]).map((source)=>source.url)),

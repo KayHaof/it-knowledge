@@ -5,37 +5,67 @@
     <p>Mỗi câu trả lời đi từ bản 30 giây đến phân tích 2 phút, có deep dive, production perspective, đáp án sai phổ biến và nguồn chính thức.</p>
   </header>
 
-  <div class="interview-toolbar">
-    <label>Level
-      <select [value]="difficulty()" (change)="setDifficulty($event)">
-        <option value="all">Tất cả</option><option value="beginner">Beginner</option><option value="junior">Junior</option><option value="middle">Middle</option><option value="senior">Senior</option><option value="system-design">System Design</option>
-      </select>
-    </label>
-    <button class="button" type="button" (click)="random()">⤨ Câu ngẫu nhiên</button>
-    <span>{{ index()+1 }} / {{ filtered().length }}</span>
-  </div>
-
-  @if(current();as question){
-    <article class="question-card">
-      <div class="question-meta"><span class="badge">{{ question.difficulty }}</span><span>{{ question.category }}</span>@for(topic of question.topics;track topic){<span>#{{ topic }}</span>}</div>
-      <h2>{{ question.question }}</h2>
-      <button class="reveal" type="button" (click)="answerVisible.set(!answerVisible())">{{ answerVisible()?'Ẩn câu trả lời':'Hiện câu trả lời' }}</button>
-      @if(answerVisible()){
-        <div class="answer">
-          <section><span>TRẢ LỜI TRONG 30 GIÂY</span><p>{{ question.answer30s }}</p></section>
-          <section><span>TRẢ LỜI TRONG 2 PHÚT</span><p>{{ question.answer2m }}</p></section>
-          @if(question.deepDive){<section><span>DEEP DIVE</span><p>{{ question.deepDive }}</p></section>}
-          <section class="production"><span>PRODUCTION PERSPECTIVE</span><p>{{ question.production }}</p></section>
-          <section class="wrong"><span>CÂU TRẢ LỜI SAI THƯỜNG GẶP</span><p>{{ question.wrongAnswer }}</p></section>
-          <section><span>CÓ THỂ BỊ HỎI TIẾP</span><ul>@for(followUp of question.followUps;track followUp){<li>{{ followUp }}</li>}</ul></section>
-          @if(question.sources?.length){
-            <section class="question-sources"><span>OFFICIAL REFERENCES</span><ul>@for(source of question.sources;track source.url){<li><a [href]="source.url" target="_blank" rel="noreferrer">{{ source.organization }} — {{ source.title }}</a></li>}</ul></section>
-          }
-          <a [routerLink]="question.relatedLesson">Mở bài học liên quan →</a>
+  @if (loading()) {
+    <div class="empty-state" role="status">Đang tải bộ câu hỏi…</div>
+  } @else if (error()) {
+    <div class="empty-state" role="alert">{{ error() }}</div>
+  } @else {
+    <section class="interview-filters" aria-label="Bộ lọc câu hỏi">
+      <div class="filter-dimension">
+        <span class="filter-label">Category</span>
+        <div class="filter-scroller">
+          <div class="filter-tabs" role="group" aria-label="Category">
+            @for (option of categoryOptions(); track option.value) {
+              <button type="button" [class.active]="option.value === normalizedCategory()" [attr.aria-pressed]="option.value === normalizedCategory()" (click)="setCategory(option.value)">
+                <span>{{ option.label }}</span><small>{{ option.count }}</small>
+              </button>
+            }
+          </div>
         </div>
-      }
-      <footer><button class="button" type="button" (click)="state.toggleQuestion(question.id,'reviewQuestions')">{{ state.isForReview(question.id)?'✓ Cần ôn lại':'Đánh dấu ôn lại' }}</button><button class="button" type="button" (click)="state.toggleQuestion(question.id,'masteredQuestions')">{{ state.isMastered(question.id)?'✓ Đã nắm':'Đánh dấu đã nắm' }}</button></footer>
-    </article>
-    <nav class="question-nav"><button class="button" type="button" (click)="move(-1)">← Trước</button><button class="button primary" type="button" (click)="move(1)">Câu tiếp →</button></nav>
-  }@else{<div class="empty-state">Không có câu hỏi phù hợp bộ lọc.</div>}
+      </div>
+      <div class="filter-dimension">
+        <span class="filter-label">Difficulty</span>
+        <div class="filter-scroller">
+          <div class="filter-tabs" role="group" aria-label="Difficulty">
+            @for (option of difficultyOptions(); track option.value) {
+              <button type="button" [class.active]="option.value === normalizedDifficulty()" [attr.aria-pressed]="option.value === normalizedDifficulty()" (click)="setDifficulty(option.value)">
+                <span>{{ option.label }}</span><small>{{ option.count }}</small>
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="interview-toolbar">
+      <button class="button" type="button" (click)="random()">↯ Câu ngẫu nhiên</button>
+      <span>{{ filtered().length ? index() + 1 : 0 }} / {{ filtered().length }}</span>
+    </div>
+
+    @if (current(); as question) {
+      <article class="question-card">
+        <div class="question-meta"><span class="badge">{{ question.difficulty }}</span><span>{{ question.category }}</span>@for (topic of question.topics; track topic) {<span>#{{ topic }}</span>}</div>
+        <h2>{{ question.question }}</h2>
+        <button class="reveal" type="button" (click)="answerVisible.set(!answerVisible())">{{ answerVisible() ? 'Ẩn câu trả lời' : 'Hiện câu trả lời' }}</button>
+        @if (answerVisible()) {
+          <div class="answer">
+            <section><span>TRẢ LỜI TRONG 30 GIÂY</span><p>{{ question.answer30s }}</p></section>
+            <section><span>TRẢ LỜI TRONG 2 PHÚT</span><p>{{ question.answer2m }}</p></section>
+            @if (question.deepDive) {<section><span>DEEP DIVE</span><p>{{ question.deepDive }}</p></section>}
+            <section class="production"><span>PRODUCTION PERSPECTIVE</span><p>{{ question.production }}</p></section>
+            <section class="wrong"><span>CÂU TRẢ LỜI SAI THƯỜNG GẶP</span><p>{{ question.wrongAnswer }}</p></section>
+            <section><span>CÓ THỂ BỊ HỎI TIẾP</span><ul>@for (followUp of question.followUps; track followUp) {<li>{{ followUp }}</li>}</ul></section>
+            @if (question.sources?.length) {
+              <section class="question-sources"><span>OFFICIAL REFERENCES</span><ul>@for (source of question.sources; track source.url) {<li><a [href]="source.url" target="_blank" rel="noreferrer">{{ source.organization }} — {{ source.title }}</a></li>}</ul></section>
+            }
+            @if (question.relatedLesson) {<a [routerLink]="question.relatedLesson">Mở bài học liên quan →</a>}
+          </div>
+        }
+        <footer><button class="button" type="button" (click)="state.toggleQuestion(question.id, 'reviewQuestions')">{{ state.isForReview(question.id) ? '✓ Cần ôn lại' : 'Đánh dấu ôn lại' }}</button><button class="button" type="button" (click)="state.toggleQuestion(question.id, 'masteredQuestions')">{{ state.isMastered(question.id) ? '✓ Đã nắm' : 'Đánh dấu đã nắm' }}</button></footer>
+      </article>
+      <nav class="question-nav"><button class="button" type="button" (click)="move(-1)">← Trước</button><button class="button primary" type="button" (click)="move(1)">Câu tiếp →</button></nav>
+    } @else {
+      <div class="empty-state">Không có câu hỏi phù hợp bộ lọc.</div>
+    }
+  }
 </div>
