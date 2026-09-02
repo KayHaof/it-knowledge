@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, HostListener, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NAVIGATION } from '../../core/constants/navigation';
 import { LearningStateService } from '../../core/services/learning-state.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -11,6 +11,15 @@ export class AppShell {
   protected readonly searchOpen = signal(false);
   protected readonly state = inject(LearningStateService);
   protected readonly theme = inject(ThemeService);
+  private readonly router = inject(Router);
+
+  protected submitSearch(event: SubmitEvent, query: string): void {
+    event.preventDefault();
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) return;
+    this.searchOpen.set(false);
+    void this.router.navigate(['/search'], { queryParams: { q: normalizedQuery } });
+  }
 
   @HostListener('document:keydown', ['$event'])
   handleShortcut(event: KeyboardEvent): void {

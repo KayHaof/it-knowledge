@@ -28,8 +28,8 @@
     <button class="modal-dismiss" type="button" aria-label="Đóng tìm kiếm" (click)="searchOpen.set(false)"></button>
     <section class="command" role="dialog" aria-modal="true" aria-labelledby="quick-search-title">
       <h2 id="quick-search-title">Tìm trong kho kiến thức</h2>
-      <form action="/search"><label class="sr-only" for="quick-search">Từ khóa</label><input id="quick-search" name="q" placeholder="Java memory, Redis, transactional outbox..." /><button class="button primary" type="submit">Tìm kiếm</button></form>
-      <div class="quick-links"><span>Gợi ý:</span><a href="/search?q=N%2B1">N+1</a><a href="/search?q=Kafka">Kafka</a><a href="/search?q=WebFlux">WebFlux</a></div>
+      <form (submit)="submitSearch($event, quickSearch.value)"><label class="sr-only" for="quick-search">Từ khóa</label><input #quickSearch id="quick-search" name="q" placeholder="Java memory, Redis, transactional outbox..." /><button class="button primary" type="submit">Tìm kiếm</button></form>
+      <div class="quick-links"><span>Gợi ý:</span><a [routerLink]="['/search']" [queryParams]="{ q: 'N+1' }" (click)="searchOpen.set(false)">N+1</a><a [routerLink]="['/search']" [queryParams]="{ q: 'Kafka' }" (click)="searchOpen.set(false)">Kafka</a><a [routerLink]="['/search']" [queryParams]="{ q: 'WebFlux' }" (click)="searchOpen.set(false)">WebFlux</a></div>
       <footer><kbd>Esc</kbd> để đóng <span>•</span> Tìm trong tiêu đề, nội dung, tag và heading</footer>
     </section>
   </div>
