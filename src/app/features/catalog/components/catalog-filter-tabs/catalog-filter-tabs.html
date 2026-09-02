@@ -1,0 +1,20 @@
+<div class="filter-dimension">
+  <span class="filter-label">{{ label() }}</span>
+  <div #tabScroller class="tab-scroller">
+    <div class="filter-tabs" role="group" [attr.aria-label]="label()">
+      @for (option of options(); track option.value; let index = $index) {
+        <button
+          type="button"
+          [attr.data-value]="option.value"
+          [class.active]="option.value === selected()"
+          [attr.aria-pressed]="option.value === selected()"
+          (click)="select(option.value)"
+          (keydown)="handleKeydown($event, index)"
+        >
+          <span>{{ option.label }}</span>
+          <small>{{ option.count }}</small>
+        </button>
+      }
+    </div>
+  </div>
+</div>

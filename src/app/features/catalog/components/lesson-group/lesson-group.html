@@ -1,0 +1,16 @@
+<section class="lesson-group" [attr.aria-labelledby]="headingId()">
+  <header>
+    <h2 [id]="headingId()">{{ group().label }}</h2>
+    <span>{{ group().items.length }} bài</span>
+  </header>
+  <ol>
+    @for (item of group().items; track item.lesson.id) {
+      <li>
+        <app-lesson-list-item
+          [lesson]="item.lesson"
+          [curriculumIndex]="item.curriculumIndex"
+        />
+      </li>
+    }
+  </ol>
+</section>

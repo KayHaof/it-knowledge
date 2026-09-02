@@ -1,0 +1,11 @@
+@for (block of blocks(); track $index) {
+  @switch (block.type) {
+    @case ('heading') { @if(block.level === 2){<h2 [id]="block.id">{{ block.text }}</h2>}@else{<h3 [id]="block.id">{{ block.text }}</h3>} }
+    @case ('paragraph') { <p><app-inline-text [text]="block.text" /></p> }
+    @case ('list') { @if(block.ordered){<ol>@for(item of block.items;track item){<li><app-inline-text [text]="item" /></li>}</ol>}@else{<ul>@for(item of block.items;track item){<li><app-inline-text [text]="item" /></li>}</ul>} }
+    @case ('code') { <app-code-block [block]="block" /> }
+    @case ('diagram') { <app-diagram [block]="block" /> }
+    @case ('callout') { <aside class="callout" [attr.data-kind]="block.kind"><strong>{{ block.title }}</strong><p><app-inline-text [text]="block.text" /></p></aside> }
+    @case ('table') { <div class="table-scroll"><table><thead><tr>@for(header of block.headers;track header){<th><app-inline-text [text]="header" /></th>}</tr></thead><tbody>@for(row of block.rows;track $index){<tr>@for(cell of row;track $index){<td><app-inline-text [text]="cell" /></td>}</tr>}</tbody></table></div> }
+  }
+}

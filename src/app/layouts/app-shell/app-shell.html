@@ -1,0 +1,36 @@
+<a class="skip-link" href="#main-content">Bỏ qua đến nội dung</a>
+<header class="topbar">
+  <button class="icon-button mobile-only" type="button" aria-label="Mở điều hướng" (click)="menuOpen.set(!menuOpen())">☰</button>
+  <a class="brand" routerLink="/" (click)="menuOpen.set(false)"><span class="brand-mark">IK</span><span><strong>IT Knowledge</strong><small>Engineering field guide</small></span></a>
+  <button class="search-trigger" type="button" (click)="searchOpen.set(true)"><span>⌕</span><span>Tìm Java, Kafka, N+1, Microservices...</span><kbd>Ctrl K</kbd></button>
+  <a class="top-link" routerLink="/roadmap">Roadmap</a><a class="top-link" routerLink="/interview">Phỏng vấn</a>
+  <a class="icon-button" routerLink="/settings" aria-label="Cài đặt">⚙</a>
+</header>
+<div class="shell">
+  <aside class="sidebar" [class.open]="menuOpen()" aria-label="Điều hướng chính">
+    <nav>
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="menuOpen.set(false)"><span>⌂</span> Dashboard</a>
+      <p class="nav-label">LEARN</p>
+      @for (item of navigation; track item.slug) { <a [routerLink]="['/learn', item.slug]" routerLinkActive="active" (click)="menuOpen.set(false)"><span>{{ item.icon }}</span> {{ item.label }}</a> }
+      <p class="nav-label">PRACTICE</p>
+      <a routerLink="/system-design" routerLinkActive="active" (click)="menuOpen.set(false)"><span>▱</span> System Design</a>
+      <a routerLink="/roadmap" routerLinkActive="active" (click)="menuOpen.set(false)"><span>◎</span> Roadmaps</a>
+      <a routerLink="/interview" routerLinkActive="active" (click)="menuOpen.set(false)"><span>?</span> Interview</a>
+      <a routerLink="/bookmarks" routerLinkActive="active" (click)="menuOpen.set(false)"><span>☆</span> Bookmarks <em>{{ state.data().bookmarks.length }}</em></a>
+    </nav>
+    <div class="sidebar-progress"><div><span>Tiến độ</span><strong>{{ state.completedCount() }} bài</strong></div><div class="progress-track"><span [style.width.%]="state.completedCount() * 4"></span></div><a routerLink="/roadmap">Tiếp tục lộ trình →</a></div>
+  </aside>
+  @if (menuOpen()) { <button class="scrim" aria-label="Đóng điều hướng" (click)="menuOpen.set(false)"></button> }
+  <main id="main-content"><router-outlet /></main>
+</div>
+@if (searchOpen()) {
+  <div class="modal-backdrop">
+    <button class="modal-dismiss" type="button" aria-label="Đóng tìm kiếm" (click)="searchOpen.set(false)"></button>
+    <section class="command" role="dialog" aria-modal="true" aria-labelledby="quick-search-title">
+      <h2 id="quick-search-title">Tìm trong kho kiến thức</h2>
+      <form action="/search"><label class="sr-only" for="quick-search">Từ khóa</label><input id="quick-search" name="q" placeholder="Java memory, Redis, transactional outbox..." /><button class="button primary" type="submit">Tìm kiếm</button></form>
+      <div class="quick-links"><span>Gợi ý:</span><a href="/search?q=N%2B1">N+1</a><a href="/search?q=Kafka">Kafka</a><a href="/search?q=WebFlux">WebFlux</a></div>
+      <footer><kbd>Esc</kbd> để đóng <span>•</span> Tìm trong tiêu đề, nội dung, tag và heading</footer>
+    </section>
+  </div>
+}

@@ -1,0 +1,72 @@
+<div class="page catalog-page">
+  <header class="page-header">
+    <span class="eyebrow">KNOWLEDGE DOMAIN</span>
+    <h1>{{ titles[category()] || category() }}</h1>
+    <p>
+      Bắt đầu từ mental model, đi qua cơ chế bên trong, sau đó kiểm tra trade-off và
+      failure mode trong production.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <div class="catalog-state" role="status">
+      <span class="loading-mark" aria-hidden="true"></span>
+      <p>Đang sắp xếp lộ trình học…</p>
+    </div>
+  } @else if (loadError()) {
+    <div class="empty-state" role="alert">
+      <h2>Không thể tải catalog</h2>
+      <p>{{ loadError() }}</p>
+    </div>
+  } @else if (categoryLessons().length) {
+    <section class="catalog-controls" aria-label="Bộ lọc catalog">
+      <div class="filter-stack">
+        @if (technologyFacets().length) {
+          <app-catalog-filter-tabs
+            label="Công nghệ"
+            [options]="technologyOptions()"
+            [selected]="selectedTechnology()"
+            (selectedChange)="setTechnology($event)"
+          />
+        }
+        <app-catalog-filter-tabs
+          label="Cấp độ"
+          [options]="levelOptions()"
+          [selected]="selectedLevel()"
+          (selectedChange)="setLevel($event)"
+        />
+      </div>
+      <app-catalog-summary
+        [lessonCount]="visibleLessons().length"
+        [totalMinutes]="visibleMinutes()"
+        [sort]="selectedSort()"
+        (sortChange)="setSort($event)"
+      />
+    </section>
+
+    <section
+      id="lesson-catalog-results"
+      class="catalog-results"
+      aria-label="Danh sách bài học"
+    >
+      @if (groups().length) {
+        @for (group of groups(); track group.key) {
+          <app-lesson-group [group]="group" />
+        }
+      } @else {
+        <div class="empty-state filtered-empty">
+          <h2>Không có bài phù hợp</h2>
+          <p>Hai bộ lọc đang kết hợp không có bài học tương ứng.</p>
+          @if (hasActiveFilters()) {
+            <button class="button" type="button" (click)="resetFilters()">Xóa bộ lọc</button>
+          }
+        </div>
+      }
+    </section>
+  } @else {
+    <div class="empty-state">
+      <h2>Chưa có bài trong domain này</h2>
+      <p>Cấu trúc đã sẵn sàng mở rộng; hãy chọn một domain khác trong sidebar.</p>
+    </div>
+  }
+</div>

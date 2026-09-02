@@ -1,0 +1,41 @@
+<div class="lesson-row" [attr.data-status]="status()">
+  <span class="sequence">{{ sequence() }}</span>
+
+  <span class="progress-status">
+    <span class="status-icon" aria-hidden="true">{{ statusDetails().icon }}</span>
+    <span class="status-label">{{ statusDetails().label }}</span>
+  </span>
+
+  <a class="lesson-link" [routerLink]="lesson().path">
+    <strong>{{ lesson().title }}</strong>
+    <span class="concepts">{{ concepts() }}</span>
+  </a>
+
+  <div class="lesson-meta">
+    <div>
+      <span class="level-badge" [attr.data-level]="lesson().level">{{ levelLabel() }}</span>
+      <span class="duration">{{ lesson().estimatedMinutes }} phút</span>
+    </div>
+    <span class="technology">{{ lesson().technology }}</span>
+    @if (incompletePrerequisites()) {
+      <span
+        class="prerequisite"
+      >
+        ◇ {{ incompletePrerequisites() }} tiên quyết
+      </span>
+    }
+  </div>
+
+  <button
+    class="bookmark"
+    type="button"
+    [class.saved]="state.isBookmarked(lesson().id)"
+    [attr.aria-pressed]="state.isBookmarked(lesson().id)"
+    [attr.aria-label]="state.isBookmarked(lesson().id) ? 'Bỏ lưu bài ' + lesson().title : 'Lưu bài ' + lesson().title"
+    (click)="toggleBookmark()"
+  >
+    <span aria-hidden="true">{{ state.isBookmarked(lesson().id) ? '★' : '☆' }}</span>
+  </button>
+
+  <span class="arrow" aria-hidden="true">→</span>
+</div>

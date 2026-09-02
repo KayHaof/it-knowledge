@@ -1,0 +1,1 @@
+<figure class="code-frame"><figcaption><span>{{ block().title || block().language }}</span><button type="button" (click)="copy()" [attr.aria-label]="copied() ? 'Đã sao chép' : 'Sao chép mã nguồn'">{{ copied() ? 'Đã chép ✓' : 'Sao chép' }}</button></figcaption><pre><code #code [class]="'language-' + block().language">{{ block().code }}</code></pre></figure>

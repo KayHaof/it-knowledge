@@ -1,0 +1,2 @@
+import { ChangeDetectionStrategy, Component } from '@angular/core';import { RouterLink } from '@angular/router';
+@Component({selector:'app-not-found',imports:[RouterLink],template:'<div class="page"><div class="empty-state"><span class="eyebrow">404</span><h1>Trang không tồn tại</h1><p>Liên kết có thể đã thay đổi hoặc URL chưa đúng.</p><a class="button primary" routerLink="/">Về Dashboard</a></div></div>',changeDetection:ChangeDetectionStrategy.OnPush})export class NotFound{}

@@ -1,0 +1,15 @@
+<div class="catalog-summary">
+  <p aria-live="polite" aria-atomic="true">
+    <strong>{{ lessonCount() }} bài</strong>
+    <span aria-hidden="true">•</span>
+    <span>{{ formatDuration(totalMinutes()) }}</span>
+  </p>
+  <label>
+    <span>Sắp xếp</span>
+    <select [value]="sort()" (change)="changeSort($event)">
+      @for (option of sortOptions; track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
+  </label>
+</div>

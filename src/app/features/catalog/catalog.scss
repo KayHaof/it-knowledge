@@ -1,0 +1,83 @@
+.catalog-page {
+  width: min(1480px, 100%);
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.catalog-controls {
+  position: sticky;
+  z-index: 12;
+  top: 64px;
+  display: grid;
+  gap: 13px;
+  padding: 13px 0 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--background) 93%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.filter-stack {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+app-catalog-summary {
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+}
+
+.catalog-results {
+  min-height: 240px;
+  padding-bottom: 20px;
+}
+
+.catalog-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  color: var(--text-secondary);
+}
+
+.loading-mark {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+.filtered-empty {
+  margin-top: 30px;
+  padding-block: 38px;
+}
+
+.filtered-empty h2 {
+  margin-top: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 700px) {
+  .catalog-controls {
+    position: static;
+    padding-top: 10px;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-mark {
+    animation: none;
+  }
+}

@@ -1,0 +1,1 @@
+<figure class="diagram">@if(imageUrl()){<img [src]="imageUrl()" alt="Sơ đồ kỹ thuật Mermaid"/>}@else if(!failed()){<span>Đang dựng sơ đồ…</span>}@if(failed()){<figcaption>Không thể render Mermaid. Mã nguồn sơ đồ:</figcaption><pre>{{ block().code }}</pre>}</figure>
