@@ -4,10 +4,10 @@ import { ContentRepository } from './content-repository';
 import { SearchService } from './search.service';
 
 const documents: SearchDocument[] = [
-  { id:'n1',slug:'n-plus-one',title:'JPA N+1 Query',description:'Nhận diện truy vấn lặp',category:'database',technology:'Hibernate',level:'advanced',tags:['fetch'],headings:['Giải pháp'],content:'EntityGraph và DTO projection',path:'/learn/database/n-plus-one' },
-  { id:'redis',slug:'redis',title:'Redis',description:'Bộ nhớ đệm',category:'nosql',technology:'Redis',level:'intermediate',tags:['cache'],headings:['TTL'],content:'cache stampede',path:'/learn/nosql/redis' },
-  { id:'generic-lag',slug:'generic-lag',title:'Consumer patterns',description:'Consumer throughput',category:'messaging',technology:'Messaging',level:'intermediate',tags:['consumer'],headings:['Operations'],content:'Retry messages',path:'/learn/messaging/generic-lag' },
-  { id:'kafka-lag',slug:'kafka-lag',title:'Kafka operations',description:'Consumer lag troubleshooting',category:'messaging',technology:'Kafka',level:'advanced',tags:['consumer','lag'],headings:['Lag'],content:'Measure consumer lag per partition',path:'/learn/messaging/kafka-lag' },
+  { id:'n1',slug:'n-plus-one',title:'JPA N+1 Query',description:'Nhận diện truy vấn lặp',category:'database',technology:'Hibernate',level:'advanced',contentType:'performance',tags:['fetch'],headings:['Giải pháp'],content:'EntityGraph và DTO projection',path:'/learn/database/n-plus-one' },
+  { id:'redis',slug:'redis',title:'Redis',description:'Bộ nhớ đệm',category:'nosql',technology:'Redis',level:'basic',contentType:'core',tags:['cache'],headings:['TTL'],content:'cache stampede',path:'/learn/nosql/redis' },
+  { id:'generic-lag',slug:'generic-lag',title:'Consumer patterns',description:'Consumer throughput',category:'messaging',technology:'Messaging',level:'basic',contentType:'core',tags:['consumer'],headings:['Operations'],content:'Retry messages',path:'/learn/messaging/generic-lag' },
+  { id:'kafka-lag',slug:'kafka-lag',title:'Kafka operations',description:'Consumer lag troubleshooting',category:'messaging',technology:'Kafka',level:'advanced',contentType:'troubleshooting',tags:['consumer','lag'],headings:['Lag'],content:'Measure consumer lag per partition',path:'/learn/messaging/kafka-lag' },
 ];
 
 describe('SearchService', () => {
@@ -30,5 +30,15 @@ describe('SearchService', () => {
     const results = await TestBed.inject(SearchService).search('consumer lag');
     expect(results[0].id).toBe('kafka-lag');
     expect(results.findIndex((result) => result.id === 'generic-lag')).toBeGreaterThan(0);
+  });
+
+  it('composes technology, level and content type filters', async () => {
+    TestBed.configureTestingModule({ providers: [SearchService, { provide: ContentRepository, useValue: { searchIndex: () => Promise.resolve(documents) } }] });
+    const results = await TestBed.inject(SearchService).search('', {
+      technology: 'Kafka',
+      level: 'advanced',
+      contentType: 'troubleshooting',
+    });
+    expect(results.map((result) => result.id)).toEqual(['kafka-lag']);
   });
 });

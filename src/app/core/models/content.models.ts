@@ -1,5 +1,32 @@
-export type LearningLevel = 'beginner' | 'intermediate' | 'advanced' | 'senior';
-export type CalloutKind = 'note' | 'tip' | 'info' | 'warning' | 'danger' | 'best-practice' | 'interview' | 'production';
+export type LearningLevel = 'basic' | 'advanced' | 'extended';
+
+export type ContentType =
+  | 'core'
+  | 'internals'
+  | 'production'
+  | 'troubleshooting'
+  | 'performance'
+  | 'security'
+  | 'architecture'
+  | 'system-design'
+  | 'integration'
+  | 'comparison'
+  | 'reference'
+  | 'interview'
+  | 'supplementary';
+
+export type CalloutKind =
+  | 'note'
+  | 'tip'
+  | 'info'
+  | 'warning'
+  | 'danger'
+  | 'best-practice'
+  | 'interview'
+  | 'production'
+  | 'quiz'
+  | 'misconception'
+  | 'glossary';
 
 export interface SourceReference {
   title: string;
@@ -7,17 +34,12 @@ export interface SourceReference {
   organization: string;
   type:
     | 'official-documentation'
-    | 'official-api-reference'
     | 'specification'
     | 'standard'
-    | 'internet-standard'
-    | 'best-current-practice'
-    | 'primary-vendor'
-    | 'primary-vendor-guidance'
-    | 'primary-vendor-whitepaper'
-    | 'security-guidance'
+    | 'vendor-documentation'
+    | 'academic'
     | 'secondary';
-  accessedAt: string;
+  accessedAt?: string;
 }
 
 export interface LessonMetadata {
@@ -25,35 +47,88 @@ export interface LessonMetadata {
   slug: string;
   title: string;
   description: string;
-  category: string;
   technology: string;
+  domain: string;
+  category: string;
   level: LearningLevel;
+  contentType: ContentType;
+  order: number;
   estimatedMinutes: number;
   tags: string[];
   prerequisites: string[];
   related: string[];
-  next: string;
+  aliases?: string[];
   learningObjectives: string[];
   lastReviewed: string;
   appliesTo?: Record<string, string>;
+  deprecated?: boolean;
+  replacedBy?: string;
   sources: SourceReference[];
 }
 
-export interface HeadingBlock { type: 'heading'; level: 2 | 3; id: string; text: string }
-export interface ParagraphBlock { type: 'paragraph'; text: string }
-export interface ListBlock { type: 'list'; ordered: boolean; items: string[] }
+export interface HeadingBlock {
+  type: 'heading';
+  level: 2 | 3;
+  id: string;
+  text: string;
+}
+export interface InlineTextRun {
+  type: 'text';
+  text: string;
+  strong: boolean;
+  code: boolean;
+}
+export interface InlineLinkRun {
+  type: 'link';
+  text: string;
+  href: string;
+  title?: string;
+  strong: boolean;
+  code: boolean;
+}
+export type InlineRun = InlineTextRun | InlineLinkRun;
+export interface ParagraphBlock { type: 'paragraph'; text: string; inline?: InlineRun[] }
+export interface ListBlock {
+  type: 'list';
+  ordered: boolean;
+  items: string[];
+  inlineItems?: InlineRun[][];
+}
 export interface CodeBlock { type: 'code'; language: string; title: string; code: string }
 export interface DiagramBlock { type: 'diagram'; code: string }
-export interface CalloutBlock { type: 'callout'; kind: CalloutKind; title: string; text: string }
-export interface TableBlock { type: 'table'; headers: string[]; rows: string[][] }
-export type ContentBlock = HeadingBlock | ParagraphBlock | ListBlock | CodeBlock | DiagramBlock | CalloutBlock | TableBlock;
+export interface CalloutBlock {
+  type: 'callout';
+  kind: CalloutKind;
+  title: string;
+  text: string;
+  inline?: InlineRun[];
+}
+export interface TableBlock {
+  type: 'table';
+  headers: string[];
+  rows: string[][];
+  inlineHeaders?: InlineRun[][];
+  inlineRows?: InlineRun[][][];
+}
+export type ContentBlock =
+  | HeadingBlock
+  | ParagraphBlock
+  | ListBlock
+  | CodeBlock
+  | DiagramBlock
+  | CalloutBlock
+  | TableBlock;
 
 export interface Lesson extends LessonMetadata {
   path: string;
   headings: { id: string; text: string; level: 2 | 3 }[];
   blocks: ContentBlock[];
   searchText: string;
+  previous?: string;
+  next?: string;
 }
+
+export type KnowledgeDocument = Lesson;
 
 export interface SearchDocument {
   id: string;
@@ -63,31 +138,98 @@ export interface SearchDocument {
   category: string;
   technology: string;
   level: LearningLevel;
+  contentType: ContentType;
   tags: string[];
+  aliases?: string[];
   headings: string[];
   content: string;
   path: string;
 }
 
+export type InterviewDifficulty = 'junior' | 'middle' | 'senior' | 'system-design';
+export type InterviewScoreDimension =
+  | 'technicalCorrectness'
+  | 'completeness'
+  | 'reasoning'
+  | 'production'
+  | 'tradeoffs'
+  | 'communication';
+
+export interface InterviewRubricConcept {
+  id: string;
+  required?: boolean;
+  aliases: string[];
+  points?: Partial<Record<InterviewScoreDimension, number>>;
+}
+
+export interface InterviewRubricMisconception {
+  id: string;
+  patterns: string[];
+  penalty: number;
+}
+
+export interface InterviewRubric {
+  dimensions: Record<InterviewScoreDimension, number>;
+  concepts: InterviewRubricConcept[];
+  misconceptions: InterviewRubricMisconception[];
+}
+
 export interface InterviewQuestion {
   id: string;
+  technology: string;
   category: string;
-  difficulty: 'beginner' | 'junior' | 'middle' | 'senior' | 'system-design';
+  difficulty: InterviewDifficulty;
   topics: string[];
   question: string;
   answer30s: string;
-  answer2m: string;
+  answerDetailed: string;
+  /** Compatibility alias retained while old persisted exports are imported. */
+  answer2m?: string;
   deepDive?: string;
   production: string;
+  tradeoffs: string;
   wrongAnswer: string;
   followUps: string[];
-  relatedLesson: string;
-  sources?: SourceReference[];
+  relatedLessons: string[];
+  relatedLessonLinks?: { id: string; title: string; path: string }[];
+  /** Stable route for the first related lesson, generated by the compiler. */
+  relatedLesson?: string;
+  sources: SourceReference[];
+  rubric: InterviewRubric;
 }
+
+export type { Flashcard } from '../flashcards/flashcard.models';
 
 export interface RoadmapDefinition {
   id: string;
   title: string;
   description: string;
   steps: { lessonId: string; note: string }[];
+}
+
+export interface ContentManifest {
+  schemaVersion: number;
+  notice: string;
+  artifacts: string[];
+  levels: LearningLevel[];
+  contentTypes: ContentType[];
+  technologies: string[];
+  counts: {
+    lessons: number;
+    interviewQuestions: number;
+    flashcards: number;
+    roadmaps: number;
+  };
+}
+
+export interface ContentStats {
+  totalLessons: number;
+  byTechnology: Record<string, number>;
+  byLevel: Record<LearningLevel, number>;
+  byContentType: Record<ContentType, number>;
+  interviewQuestionCount: number;
+  flashcardCount: number;
+  sourceCount: number;
+  warningCount: number;
+  warnings: string[];
 }

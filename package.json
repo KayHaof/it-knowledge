@@ -3,13 +3,16 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "npm run content:index && ng serve",
-    "build": "npm run content:validate && npm run content:index && ng build",
+    "start": "npm run content:build && ng serve",
+    "build": "npm run content:validate && npm run content:build && ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test --watch=false",
+    "test": "npm run content:test && ng test --watch=false",
     "lint": "ng lint",
     "content:validate": "node scripts/content/content-pipeline.mjs validate",
-    "content:index": "node scripts/content/content-pipeline.mjs build",
+    "content:build": "node scripts/content/content-pipeline.mjs build",
+    "content:index": "node scripts/content/content-pipeline.mjs index",
+    "content:stats": "node scripts/content/content-pipeline.mjs stats",
+    "content:test": "node --test scripts/content/tests/content-pipeline.test.mjs",
     "content:check-links": "node scripts/content/content-pipeline.mjs check-links"
   },
   "prettier": {
@@ -45,7 +48,9 @@
     "@eslint/js": "^9.39.5",
     "angular-eslint": "^21.4.0",
     "eslint": "^9.39.5",
+    "js-yaml": "^4.1.0",
     "jsdom": "^27.1.0",
+    "marked": "^16.4.2",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.69.0",
     "vitest": "^4.0.8"

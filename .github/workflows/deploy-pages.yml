@@ -52,6 +52,17 @@ jobs:
       - name: Build Angular application
         run: npm run build -- --configuration production --base-href "/${{ github.event.repository.name }}/"
 
+      - name: Verify generated content artifact
+        run: |
+          test -f dist/it-learning-platform/browser/generated/lessons.json
+          test -f dist/it-learning-platform/browser/generated/interview.json
+          test -f dist/it-learning-platform/browser/generated/flashcards.json
+          test -f dist/it-learning-platform/browser/generated/search-index.json
+          test -f dist/it-learning-platform/browser/generated/roadmaps.json
+          test -f dist/it-learning-platform/browser/generated/manifest.json
+          test -f dist/it-learning-platform/browser/generated/content-stats.json
+          grep -F '<base href="/${{ github.event.repository.name }}/">' dist/it-learning-platform/browser/index.html
+
       - name: Create SPA fallback
         run: |
           cp dist/it-learning-platform/browser/index.html dist/it-learning-platform/browser/404.html

@@ -22,4 +22,19 @@ describe('LearningStateService', () => {
   it('rejects an unknown import schema', () => {
     expect(service.importData('{"version":2}')).toBe(false);
   });
+
+  it('migrates the three interview IDs that collided with lesson IDs', () => {
+    const imported = {
+      version: 1,
+      progress: {},
+      bookmarks: [],
+      recent: [],
+      masteredQuestions: ['system-design-job-scheduler'],
+      reviewQuestions: ['system-design-payment-ledger'],
+      settings: { theme: 'system' },
+    };
+    expect(service.importData(JSON.stringify(imported))).toBe(true);
+    expect(service.isMastered('interview-system-design-job-scheduler')).toBe(true);
+    expect(service.isForReview('interview-system-design-payment-ledger')).toBe(true);
+  });
 });

@@ -1,24 +1,66 @@
 import { Injectable, inject } from '@angular/core';
 import { ContentRepository } from './content-repository';
-import { SearchDocument } from '../models/content.models';
+import { ContentType, LearningLevel, SearchDocument } from '../models/content.models';
 
 export interface RankedSearchResult extends SearchDocument { score: number; excerpt: string }
+export interface SearchFilters {
+  technology?: string;
+  level?: LearningLevel | 'all';
+  contentType?: ContentType | 'all';
+}
+
+export interface SearchFacets {
+  technologies: string[];
+  levels: LearningLevel[];
+  contentTypes: ContentType[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class SearchService {
   private readonly repository = inject(ContentRepository);
 
   private index?: Promise<SearchDocument[]>;
-  async search(query: string, limit = 20): Promise<RankedSearchResult[]> {
+  async search(query: string, filters: SearchFilters = {}, limit = 20): Promise<RankedSearchResult[]> {
     const normalizedQuery = normalize(query).trim().replace(/\s+/g, ' ');
     const terms = normalizedQuery.split(' ').filter((term) => term.length > 1);
-    if (!terms.length) return [];
+    const hasFilters = Boolean(
+      filters.technology && filters.technology !== 'all' ||
+      filters.level && filters.level !== 'all' ||
+      filters.contentType && filters.contentType !== 'all',
+    );
+    if (!terms.length && !hasFilters) return [];
     this.index ??= this.repository.searchIndex();
     return (await this.index)
-      .map((document) => rank(document, terms, normalizedQuery))
+      .filter((document) => matchesFilters(document, filters))
+      .map((document) => terms.length ? rank(document, terms, normalizedQuery) : rankWithoutQuery(document))
       .filter((result) => result.score > 0)
       .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'vi'))
       .slice(0, limit);
   }
+
+  async facets(): Promise<SearchFacets> {
+    this.index ??= this.repository.searchIndex();
+    const documents = await this.index;
+    return {
+      technologies: [...new Set(documents.map((item) => item.technology))].sort((a, b) =>
+        a.localeCompare(b, 'vi'),
+      ),
+      levels: [...new Set(documents.map((item) => item.level))],
+      contentTypes: [...new Set(documents.map((item) => item.contentType))].sort(),
+    };
+  }
+}
+
+function matchesFilters(document: SearchDocument, filters: SearchFilters): boolean {
+  return (
+    (!filters.technology || filters.technology === 'all' || document.technology === filters.technology) &&
+    (!filters.level || filters.level === 'all' || document.level === filters.level) &&
+    (!filters.contentType || filters.contentType === 'all' || document.contentType === filters.contentType)
+  );
+}
+
+function rankWithoutQuery(document: SearchDocument): RankedSearchResult {
+  return { ...document, score: 1, excerpt: document.description };
 }
 function rank(document: SearchDocument, terms: string[], phrase: string): RankedSearchResult {
   const title = normalize(document.title);

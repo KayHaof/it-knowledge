@@ -39,19 +39,19 @@ describe('Catalog', () => {
     const page = harness.routeNativeElement;
     expect(page).not.toBeNull();
     expect(findButton(page, 'JPA / Hibernate')?.getAttribute('aria-pressed')).toBe('true');
-    expect(findButton(page, 'Advanced')?.getAttribute('aria-pressed')).toBe('true');
+    expect(findButton(page, 'Nâng cao')?.getAttribute('aria-pressed')).toBe('true');
     expect(page?.querySelectorAll('app-lesson-list-item')).toHaveLength(1);
     expect(page?.querySelector('[data-status="completed"]')).not.toBeNull();
 
-    const seniorButton = findButton(page, 'Senior');
-    expect(seniorButton).toBeDefined();
-    seniorButton?.click();
+    const extendedButton = findButton(page, 'Mở rộng');
+    expect(extendedButton).toBeDefined();
+    extendedButton?.click();
     await harness.fixture.whenStable();
     harness.detectChanges();
 
     const queryParams = TestBed.inject(Router).parseUrl(TestBed.inject(Router).url).queryParams;
     expect(queryParams['technology']).toBe('jpa');
-    expect(queryParams['level']).toBe('senior');
+    expect(queryParams['level']).toBe('extended');
     expect(queryParams['ref']).toBe('shared');
     expect(harness.routeNativeElement?.textContent).toContain('JPA Locking');
     expect(harness.routeNativeElement?.textContent).not.toContain('JPA Context');
@@ -98,16 +98,16 @@ function findButton(root: HTMLElement | null, label: string): HTMLButtonElement 
 
 function backendLessons(): Lesson[] {
   return [
-    createLesson('java-object', 'Java Object', 'beginner', 'Java', ['java']),
-    createLesson('java-collections', 'Java Collections', 'intermediate', 'Java', ['java']),
-    createLesson('jvm-memory', 'JVM Memory', 'intermediate', 'Java / JVM', ['java', 'jvm']),
-    createLesson('jvm-profile', 'JVM Profile', 'senior', 'Java / JVM', ['java', 'jvm']),
-    createLesson('spring-core', 'Spring Core', 'intermediate', 'Spring', ['spring'], ['java-object']),
+    createLesson('java-object', 'Java Object', 'basic', 'Java', ['java']),
+    createLesson('java-collections', 'Java Collections', 'basic', 'Java', ['java']),
+    createLesson('jvm-memory', 'JVM Memory', 'basic', 'Java / JVM', ['java', 'jvm']),
+    createLesson('jvm-profile', 'JVM Profile', 'extended', 'Java / JVM', ['java', 'jvm']),
+    createLesson('spring-core', 'Spring Core', 'basic', 'Spring', ['spring'], ['java-object']),
     createLesson('spring-boot', 'Spring Boot', 'advanced', 'Spring Boot', ['spring-boot'], ['spring-core']),
     createLesson('jpa-context', 'JPA Context', 'advanced', 'JPA / Hibernate', ['jpa', 'hibernate'], ['spring-core']),
-    createLesson('jpa-locking', 'JPA Locking', 'senior', 'Spring Data JPA / Hibernate', ['spring', 'jpa', 'hibernate'], ['jpa-context']),
-    createLesson('java-errors', 'Java Errors', 'beginner', 'Java', ['java']),
-    createLesson('spring-testing', 'Spring Testing', 'intermediate', 'Spring Boot', ['spring-boot'], ['spring-core']),
+    createLesson('jpa-locking', 'JPA Locking', 'extended', 'Spring Data JPA / Hibernate', ['spring', 'jpa', 'hibernate'], ['jpa-context']),
+    createLesson('java-errors', 'Java Errors', 'basic', 'Java', ['java']),
+    createLesson('spring-testing', 'Spring Testing', 'advanced', 'Spring Boot', ['spring-boot'], ['spring-core']),
   ];
 }
 
@@ -124,9 +124,12 @@ function createLesson(
     slug: id,
     title,
     description: '',
+    domain: 'backend',
     category: 'backend',
     technology,
     level,
+    contentType: 'core',
+    order: 10,
     estimatedMinutes: 55,
     tags,
     prerequisites,

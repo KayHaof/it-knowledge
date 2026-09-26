@@ -1,0 +1,136 @@
+<div class="page flashcards-page">
+  <header class="page-header">
+    <span class="eyebrow">ACTIVE RECALL</span>
+    <h1>Ôn tập bằng flashcard</h1>
+    <p>
+      Tự nhớ câu trả lời trước khi lật thẻ, sau đó chọn mức độ để nhận lịch ôn gợi ý minh
+      bạch và lưu cục bộ trên thiết bị này.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <div class="empty-state" role="status">Đang tải flashcard…</div>
+  } @else if (error()) {
+    <div class="empty-state" role="alert">{{ error() }}</div>
+  } @else {
+    <section class="flashcard-controls" aria-label="Bộ lọc flashcard">
+      <div class="metadata-filters">
+        @if (technologyOptions().length > 2) {
+          <label>
+            <span>Công nghệ</span>
+            <select [value]="technology()" (change)="setTechnology($event)">
+              @for (option of technologyOptions(); track option.value) {
+                <option [value]="option.value">{{ option.label }} ({{ option.count }})</option>
+              }
+            </select>
+          </label>
+        }
+        @if (levelOptions().length > 2) {
+          <label>
+            <span>Cấp độ</span>
+            <select [value]="level()" (change)="setLevel($event)">
+              @for (option of levelOptions(); track option.value) {
+                <option [value]="option.value">{{ option.label }} ({{ option.count }})</option>
+              }
+            </select>
+          </label>
+        }
+        @if (categoryOptions().length > 2) {
+          <label>
+            <span>Chủ đề</span>
+            <select [value]="category()" (change)="setCategory($event)">
+              @for (option of categoryOptions(); track option.value) {
+                <option [value]="option.value">{{ option.label }} ({{ option.count }})</option>
+              }
+            </select>
+          </label>
+        }
+      </div>
+
+      <div class="study-modes" role="group" aria-label="Chế độ học">
+        @for (option of modeOptions(); track option.value) {
+          <button
+            type="button"
+            [class.active]="mode() === option.value"
+            [attr.aria-pressed]="mode() === option.value"
+            (click)="setMode(option.value)"
+          >
+            {{ option.label }} <small>{{ option.count }}</small>
+          </button>
+        }
+      </div>
+    </section>
+
+    <div class="flashcard-toolbar">
+      <span aria-live="polite">
+        {{ filtered().length ? currentIndex() + 1 : 0 }} / {{ filtered().length }} thẻ
+      </span>
+      <button class="button" type="button" [disabled]="filtered().length < 2" (click)="shuffle()">
+        ↯ Trộn thẻ
+      </button>
+    </div>
+
+    @if (current(); as card) {
+      <article class="study-card">
+        <div class="card-meta">
+          <span class="badge">{{ levelLabel(card.level) }}</span>
+          <span>{{ card.technology }}</span>
+          <span>{{ card.category }}</span>
+          <span class="origin" [class.generated]="card.generated">
+            {{ card.generated ? 'Thẻ dẫn xuất' : 'Thẻ biên soạn' }}
+          </span>
+        </div>
+
+        <button
+          class="flashcard-surface"
+          type="button"
+          [attr.aria-pressed]="flipped()"
+          [attr.aria-label]="flipped() ? 'Mặt sau. Nhấn để xem câu hỏi' : 'Mặt trước. Nhấn để xem đáp án'"
+          (click)="toggleFlip()"
+        >
+          <span class="side-label">{{ flipped() ? 'Mặt sau' : 'Mặt trước' }}</span>
+          <strong class="card-copy">{{ flipped() ? card.back : card.front }}</strong>
+          <small>Nhấn thẻ hoặc phím F / Space để lật</small>
+        </button>
+
+        <div class="card-actions">
+          <button class="button" type="button" (click)="move(-1)">← Trước</button>
+          <button
+            class="button bookmark"
+            type="button"
+            [attr.aria-pressed]="state.isBookmarked(card.id)"
+            (click)="toggleBookmark(card)"
+          >
+            {{ state.isBookmarked(card.id) ? '★ Đã lưu' : '☆ Lưu thẻ' }}
+          </button>
+          <button class="button primary" type="button" (click)="move(1)">Tiếp →</button>
+        </div>
+
+        @if (sourcePath(card); as path) {
+          <a class="source-link" [routerLink]="path">{{ sourceTitle(card) }} →</a>
+        }
+
+        <section class="rating-panel" aria-labelledby="flashcard-rating-title">
+          <div>
+            <h2 id="flashcard-rating-title">Bạn nhớ tốt đến đâu?</h2>
+            <p>Lật thẻ trước khi chọn. Lịch này là gợi ý đơn giản, không phải thuật toán tối ưu khoa học.</p>
+          </div>
+          <div class="rating-buttons">
+            <button type="button" data-rating="again" [disabled]="!flipped()" (click)="rate(card, 'again')">Again <small>10 phút</small></button>
+            <button type="button" data-rating="hard" [disabled]="!flipped()" (click)="rate(card, 'hard')">Hard <small>ngắn</small></button>
+            <button type="button" data-rating="good" [disabled]="!flipped()" (click)="rate(card, 'good')">Good <small>bình thường</small></button>
+            <button type="button" data-rating="easy" [disabled]="!flipped()" (click)="rate(card, 'easy')">Easy <small>dài hơn</small></button>
+          </div>
+          @if (reviewMessage()) {
+            <p class="review-message" role="status">{{ reviewMessage() }}</p>
+          }
+        </section>
+      </article>
+    } @else {
+      <div class="empty-state">
+        <h2>Không có flashcard phù hợp</h2>
+        <p>Hãy đổi bộ lọc hoặc chế độ học để tiếp tục.</p>
+      </div>
+    }
+  }
+</div>

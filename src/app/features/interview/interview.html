@@ -2,7 +2,14 @@
   <header class="page-header">
     <span class="eyebrow">INTERVIEW LAB</span>
     <h1>Luyện cách giải thích, không học thuộc lòng</h1>
-    <p>Mỗi câu trả lời đi từ bản 30 giây đến phân tích 2 phút, có deep dive, production perspective, đáp án sai phổ biến và nguồn chính thức.</p>
+    <p>
+      Viết câu trả lời, nhận phản hồi theo rubric minh bạch rồi đối chiếu với đáp án
+      được biên soạn từ tài liệu học.
+    </p>
+    <p class="evaluation-status" role="status">
+      <strong>Đánh giá tự động theo rubric:</strong> đang hoạt động.
+      <span>AI semantic evaluation: chưa được cấu hình.</span>
+    </p>
   </header>
 
   @if (loading()) {
@@ -16,7 +23,12 @@
         <div class="filter-scroller">
           <div class="filter-tabs" role="group" aria-label="Category">
             @for (option of categoryOptions(); track option.value) {
-              <button type="button" [class.active]="option.value === normalizedCategory()" [attr.aria-pressed]="option.value === normalizedCategory()" (click)="setCategory(option.value)">
+              <button
+                type="button"
+                [class.active]="option.value === normalizedCategory()"
+                [attr.aria-pressed]="option.value === normalizedCategory()"
+                (click)="setCategory(option.value)"
+              >
                 <span>{{ option.label }}</span><small>{{ option.count }}</small>
               </button>
             }
@@ -28,7 +40,12 @@
         <div class="filter-scroller">
           <div class="filter-tabs" role="group" aria-label="Difficulty">
             @for (option of difficultyOptions(); track option.value) {
-              <button type="button" [class.active]="option.value === normalizedDifficulty()" [attr.aria-pressed]="option.value === normalizedDifficulty()" (click)="setDifficulty(option.value)">
+              <button
+                type="button"
+                [class.active]="option.value === normalizedDifficulty()"
+                [attr.aria-pressed]="option.value === normalizedDifficulty()"
+                (click)="setDifficulty(option.value)"
+              >
                 <span>{{ option.label }}</span><small>{{ option.count }}</small>
               </button>
             }
@@ -44,28 +61,316 @@
 
     @if (current(); as question) {
       <article class="question-card">
-        <div class="question-meta"><span class="badge">{{ question.difficulty }}</span><span>{{ question.category }}</span>@for (topic of question.topics; track topic) {<span>#{{ topic }}</span>}</div>
-        <h2>{{ question.question }}</h2>
-        <button class="reveal" type="button" (click)="answerVisible.set(!answerVisible())">{{ answerVisible() ? 'Ẩn câu trả lời' : 'Hiện câu trả lời' }}</button>
-        @if (answerVisible()) {
-          <div class="answer">
-            <section><span>TRẢ LỜI TRONG 30 GIÂY</span><p>{{ question.answer30s }}</p></section>
-            <section><span>TRẢ LỜI TRONG 2 PHÚT</span><p>{{ question.answer2m }}</p></section>
-            @if (question.deepDive) {<section><span>DEEP DIVE</span><p>{{ question.deepDive }}</p></section>}
-            <section class="production"><span>PRODUCTION PERSPECTIVE</span><p>{{ question.production }}</p></section>
-            <section class="wrong"><span>CÂU TRẢ LỜI SAI THƯỜNG GẶP</span><p>{{ question.wrongAnswer }}</p></section>
-            <section><span>CÓ THỂ BỊ HỎI TIẾP</span><ul>@for (followUp of question.followUps; track followUp) {<li>{{ followUp }}</li>}</ul></section>
-            @if (question.sources?.length) {
-              <section class="question-sources"><span>OFFICIAL REFERENCES</span><ul>@for (source of question.sources; track source.url) {<li><a [href]="source.url" target="_blank" rel="noreferrer">{{ source.organization }} — {{ source.title }}</a></li>}</ul></section>
-            }
-            @if (question.relatedLesson) {<a [routerLink]="question.relatedLesson">Mở bài học liên quan →</a>}
+        <div class="question-meta">
+          <span class="badge">{{ question.difficulty }}</span>
+          <span>{{ question.category }}</span>
+          @for (topic of question.topics; track topic) {
+            <span>#{{ topic }}</span>
+          }
+        </div>
+        @if (activeFollowUp(); as followUp) {
+          <div class="answer-actions follow-up-heading">
+            <span>FOLLOW-UP TỰ LUYỆN</span>
+            <button class="reveal" type="button" (click)="returnToMainQuestion()">
+              ← Quay về câu gốc
+            </button>
           </div>
+          <h2>{{ followUp }}</h2>
+        } @else {
+          <h2>{{ question.question }}</h2>
         }
-        <footer><button class="button" type="button" (click)="state.toggleQuestion(question.id, 'reviewQuestions')">{{ state.isForReview(question.id) ? '✓ Cần ôn lại' : 'Đánh dấu ôn lại' }}</button><button class="button" type="button" (click)="state.toggleQuestion(question.id, 'masteredQuestions')">{{ state.isMastered(question.id) ? '✓ Đã nắm' : 'Đánh dấu đã nắm' }}</button></footer>
+
+        <form class="answer-form" (submit)="submitAnswer(); $event.preventDefault()">
+          <label for="interview-answer">
+            {{ activeFollowUp() ? 'Bản nháp tự luyện của bạn' : 'Câu trả lời của bạn' }}
+          </label>
+          <textarea
+            id="interview-answer"
+            name="answer"
+            rows="9"
+            [value]="draftAnswer()"
+            (input)="updateDraft($event)"
+            aria-describedby="grading-limit"
+            placeholder="Trình bày mental model, cơ chế, production perspective và trade-off…"
+          ></textarea>
+          <div class="answer-actions">
+            <span>{{ draftAnswer().length }} ký tự</span>
+            <button
+              class="button primary"
+              type="submit"
+              [disabled]="activeFollowUp() !== null || !draftAnswer().trim() || evaluating()"
+            >
+              {{
+                activeFollowUp()
+                  ? 'Chưa có rubric riêng'
+                  : evaluating()
+                    ? 'Đang đánh giá…'
+                    : 'Nộp câu trả lời'
+              }}
+            </button>
+          </div>
+          <p id="grading-limit" class="grading-limit">
+            @if (activeFollowUp()) {
+              Prompt follow-up này chưa có rubric và đáp án riêng, nên hệ thống không chấm điểm
+              hoặc lưu vào lịch sử. Bạn vẫn có thể viết bản nháp để tự luyện.
+            } @else {
+              Điểm dựa trên concept, synonym, misconception và dấu hiệu giải thích được định
+              nghĩa trong rubric. Đây không phải đánh giá ngữ nghĩa bằng AI.
+            }
+          </p>
+          @if (evaluationError()) {
+            <p class="form-error" role="alert">{{ evaluationError() }}</p>
+          }
+        </form>
+
+        @if (evaluation(); as result) {
+          <section class="evaluation" aria-labelledby="evaluation-title">
+            <div class="score-summary">
+              <div>
+                <span id="evaluation-title">ĐIỂM TỔNG</span>
+                <strong>{{ result.score }}</strong><small>/100</small>
+              </div>
+              <div class="score-label" [attr.data-label]="result.label">
+                {{ result.label }}
+              </div>
+            </div>
+
+            <div class="dimension-grid" aria-label="Điểm từng tiêu chí">
+              @for (dimension of result.dimensions; track dimension.key) {
+                <article>
+                  <div>
+                    <strong>{{ dimension.label }}</strong>
+                    <span>{{ dimension.score }}/{{ dimension.maxScore }}</span>
+                  </div>
+                  <progress
+                    [value]="dimension.score"
+                    [max]="dimension.maxScore"
+                    [attr.aria-label]="dimension.label"
+                  ></progress>
+                  @for (reason of dimension.reasons; track reason) {
+                    <small>{{ reason }}</small>
+                  }
+                </article>
+              }
+            </div>
+
+            <div class="feedback-grid">
+              <section class="positive">
+                <h3>Ý đúng</h3>
+                @if (result.strengths.length) {
+                  <ul>
+                    @for (item of result.strengths; track item) {
+                      <li>{{ item }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <p>Chưa nhận diện được concept nào trong rubric.</p>
+                }
+              </section>
+              <section>
+                <h3>Ý còn thiếu</h3>
+                @if (result.missingConcepts.length) {
+                  <ul>
+                    @for (item of result.missingConcepts; track item) {
+                      <li>{{ item }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <p>Đã phủ các concept được khai báo.</p>
+                }
+              </section>
+              <section class="negative">
+                <h3>Ý sai / misconception</h3>
+                @if (result.incorrectClaims.length) {
+                  <ul>
+                    @for (item of result.incorrectClaims; track item) {
+                      <li>{{ item }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <p>Không phát hiện misconception được khai báo.</p>
+                }
+              </section>
+              <section>
+                <h3>Cách cải thiện</h3>
+                <ul>
+                  @for (item of result.improvements; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </section>
+            </div>
+
+            <details class="score-reasons">
+              <summary>Vì sao có điểm này?</summary>
+              <ul>
+                @for (reason of result.reasons; track reason) {
+                  <li>{{ reason }}</li>
+                }
+              </ul>
+            </details>
+          </section>
+        }
+
+        @if (!activeFollowUp()) {
+          <button
+            class="reveal"
+            type="button"
+            (click)="answerVisible.set(!answerVisible())"
+          >
+            {{ answerVisible() ? 'Ẩn đáp án tham khảo' : 'Hiện đáp án tham khảo' }}
+          </button>
+
+          @if (answerVisible()) {
+            <div class="answer">
+            <section>
+              <span>TRẢ LỜI TRONG 30 GIÂY</span>
+              <p>{{ question.answer30s }}</p>
+            </section>
+            @if (detailedAnswer(question); as detailed) {
+              <section><span>CÂU TRẢ LỜI CHI TIẾT</span><p>{{ detailed }}</p></section>
+            }
+            @if (question.deepDive) {
+              <section><span>DEEP DIVE</span><p>{{ question.deepDive }}</p></section>
+            }
+            <section class="production">
+              <span>PRODUCTION PERSPECTIVE</span><p>{{ question.production }}</p>
+            </section>
+            @if (tradeoffsText(question); as tradeoffs) {
+              <section class="tradeoffs"><span>TRADE-OFFS</span><p>{{ tradeoffs }}</p></section>
+            }
+            <section class="wrong">
+              <span>CÂU TRẢ LỜI SAI THƯỜNG GẶP</span><p>{{ question.wrongAnswer }}</p>
+            </section>
+            <section>
+              <span>CÓ THỂ BỊ HỎI TIẾP</span>
+              <ul>
+                @for (followUp of question.followUps; track followUp) {
+                  <li>
+                    @if (followUpTarget(followUp, question); as target) {
+                      <a
+                        class="follow-up-link reveal"
+                        routerLink="/interview"
+                        [queryParams]="followUpQueryParams(target)"
+                      >
+                        <span>{{ followUp }}</span><small>Luyện câu liên quan →</small>
+                      </a>
+                    } @else {
+                      <button
+                        type="button"
+                        class="follow-up-link reveal"
+                        (click)="practiceFollowUp(followUp)"
+                      >
+                        <span>{{ followUp }}</span><small>Tự luyện →</small>
+                      </button>
+                    }
+                  </li>
+                }
+              </ul>
+            </section>
+            @if (question.sources.length) {
+              <section class="question-sources">
+                <span>OFFICIAL REFERENCES</span>
+                <ul>
+                  @for (source of question.sources; track source.url) {
+                    <li>
+                      <a [href]="source.url" target="_blank" rel="noopener noreferrer">
+                        {{ source.organization }} — {{ source.title }}
+                      </a>
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+            @if (relatedLessonLinks(question).length) {
+              <section>
+                <span>RELATED LESSONS</span>
+                <ul>
+                  @for (lesson of relatedLessonLinks(question); track lesson.id) {
+                    <li><a [routerLink]="lesson.path">{{ lesson.title }}</a></li>
+                  }
+                </ul>
+              </section>
+            } @else if (relatedLessonIds(question).length) {
+              <section><span>RELATED LESSONS</span><p>{{ relatedLessonIds(question).join(', ') }}</p></section>
+            }
+            @if (question.relatedLesson) {
+              <a [routerLink]="question.relatedLesson">Mở bài học liên quan →</a>
+            }
+            </div>
+          }
+        }
+
+        <footer>
+          <button
+            class="button"
+            type="button"
+            (click)="state.toggleQuestion(question.id, 'reviewQuestions')"
+          >
+            {{ state.isForReview(question.id) ? '✓ Cần ôn lại' : 'Đánh dấu ôn lại' }}
+          </button>
+          <button
+            class="button"
+            type="button"
+            (click)="state.toggleQuestion(question.id, 'masteredQuestions')"
+          >
+            {{ state.isMastered(question.id) ? '✓ Đã nắm' : 'Đánh dấu đã nắm' }}
+          </button>
+        </footer>
       </article>
-      <nav class="question-nav"><button class="button" type="button" (click)="move(-1)">← Trước</button><button class="button primary" type="button" (click)="move(1)">Câu tiếp →</button></nav>
+      <nav class="question-nav" aria-label="Điều hướng câu hỏi">
+        <button class="button" type="button" (click)="move(-1)">← Trước</button>
+        <button class="button primary" type="button" (click)="move(1)">Câu tiếp →</button>
+      </nav>
     } @else {
       <div class="empty-state">Không có câu hỏi phù hợp bộ lọc.</div>
     }
+
+    <section class="history-panel" aria-labelledby="history-title">
+      <div class="history-heading">
+        <div>
+          <span class="eyebrow">LOCAL HISTORY</span>
+          <h2 id="history-title">Lịch sử phỏng vấn</h2>
+        </div>
+        @if (historyEntries().length && !confirmingClearHistory()) {
+          <button class="button" type="button" (click)="requestClearHistory()">
+            Xóa lịch sử
+          </button>
+        }
+      </div>
+
+      @if (confirmingClearHistory()) {
+        <div class="clear-confirmation" role="alert">
+          <p>Xóa toàn bộ câu trả lời và kết quả đã lưu trên thiết bị này?</p>
+          <div>
+            <button class="button" type="button" (click)="cancelClearHistory()">Hủy</button>
+            <button class="button danger" type="button" (click)="clearHistory()">
+              Xác nhận xóa
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (historyEntries().length) {
+        <ol class="history-list">
+          @for (entry of historyEntries(); track entry.questionId + entry.timestamp) {
+            <li>
+              <div>
+                <span>
+                  {{ entry.technology }} · {{ entry.category }} ·
+                  {{ difficultyLabel(entry.difficulty) }}
+                </span>
+                <time [attr.datetime]="entry.timestamp">{{ formatTimestamp(entry) }}</time>
+              </div>
+              <strong>{{ entry.question }}</strong>
+              <p>{{ entry.answer }}</p>
+              <b>{{ entry.evaluation.score }}/100 · {{ entry.evaluation.label }}</b>
+            </li>
+          }
+        </ol>
+      } @else {
+        <p class="history-empty">Chưa có lần luyện nào. Kết quả sẽ chỉ được lưu trên thiết bị này.</p>
+      }
+    </section>
   }
 </div>

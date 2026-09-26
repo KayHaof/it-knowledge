@@ -1,5 +1,9 @@
 import { Lesson, LearningLevel, RoadmapDefinition } from '../../core/models/content.models';
 import {
+  LEARNING_LEVEL_LABELS,
+  LEARNING_LEVELS,
+} from '../../core/constants/learning-levels';
+import {
   CatalogFilterOption,
   CatalogLessonGroup,
   CatalogLevel,
@@ -7,19 +11,8 @@ import {
   TechnologyFacet,
 } from './catalog.models';
 
-export const LEVELS: readonly LearningLevel[] = [
-  'beginner',
-  'intermediate',
-  'advanced',
-  'senior',
-];
-
-export const LEVEL_LABELS: Readonly<Record<LearningLevel, string>> = {
-  beginner: 'Beginner',
-  intermediate: 'Intermediate',
-  advanced: 'Advanced',
-  senior: 'Senior',
-};
+export const LEVELS: readonly LearningLevel[] = LEARNING_LEVELS;
+export const LEVEL_LABELS: Readonly<Record<LearningLevel, string>> = LEARNING_LEVEL_LABELS;
 
 export const SORT_OPTIONS: readonly { value: CatalogSort; label: string }[] = [
   { value: 'route', label: 'Lộ trình' },

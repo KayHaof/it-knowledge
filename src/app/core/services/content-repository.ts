@@ -1,7 +1,15 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { InterviewQuestion, Lesson, RoadmapDefinition, SearchDocument } from '../models/content.models';
+import {
+  ContentManifest,
+  ContentStats,
+  Flashcard,
+  InterviewQuestion,
+  Lesson,
+  RoadmapDefinition,
+  SearchDocument,
+} from '../models/content.models';
 import { AssetUrlService } from './asset-url.service';
 
 @Injectable({ providedIn: 'root' })
@@ -12,6 +20,10 @@ export class ContentRepository {
   private lessonsPromise?: Promise<Lesson[]>;
   private interviewPromise?: Promise<InterviewQuestion[]>;
   private roadmapPromise?: Promise<RoadmapDefinition[]>;
+  private flashcardsPromise?: Promise<Flashcard[]>;
+  private manifestPromise?: Promise<ContentManifest>;
+  private statsPromise?: Promise<ContentStats>;
+  private searchPromise?: Promise<SearchDocument[]>;
   readonly loadError = signal('');
 
   lessons(): Promise<Lesson[]> {
@@ -29,12 +41,27 @@ export class ContentRepository {
     this.roadmapPromise ??= this.load<RoadmapDefinition[]>('generated/roadmaps.json');
     return this.roadmapPromise;
   }
-  searchIndex(): Promise<SearchDocument[]> { return this.load<SearchDocument[]>('generated/search-index.json'); }
+  flashcards(): Promise<Flashcard[]> {
+    this.flashcardsPromise ??= this.load<Flashcard[]>('generated/flashcards.json');
+    return this.flashcardsPromise;
+  }
+  manifest(): Promise<ContentManifest> {
+    this.manifestPromise ??= this.load<ContentManifest>('generated/manifest.json');
+    return this.manifestPromise;
+  }
+  stats(): Promise<ContentStats> {
+    this.statsPromise ??= this.load<ContentStats>('generated/content-stats.json');
+    return this.statsPromise;
+  }
+  searchIndex(): Promise<SearchDocument[]> {
+    this.searchPromise ??= this.load<SearchDocument[]>('generated/search-index.json');
+    return this.searchPromise;
+  }
 
   private async load<T>(url: string): Promise<T> {
     try { return await firstValueFrom(this.http.get<T>(this.assets.resolve(url))); }
     catch (error) {
-      this.loadError.set('Không thể tải kho nội dung. Hãy chạy npm run content:index.');
+      this.loadError.set('Không thể tải dữ liệu học tập. Vui lòng thử tải lại trang.');
       throw error;
     }
   }

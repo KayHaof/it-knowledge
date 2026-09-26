@@ -1,1 +1,75 @@
-<div class="page search-page"><header class="page-header"><span class="eyebrow">FULL-TEXT SEARCH</span><h1>Tìm kiến thức</h1><p>Tìm đồng thời trong tiêu đề, mô tả, heading, tag, technology và toàn bộ nội dung.</p></header><form (ngSubmit)="submit()"><label class="sr-only" for="search-input">Từ khóa</label><input id="search-input" name="q" [(ngModel)]="query" placeholder="Ví dụ: N+1, happens-before, cache stampede…"/><button class="button primary">Tìm</button></form>@if(searching()){<p class="muted">Đang tìm…</p>}@else if(query && !results().length){<div class="empty-state"><h2>Không có kết quả cho “{{ query }}”</h2><p>Thử một thuật ngữ rộng hơn hoặc kiểm tra chính tả.</p></div>}@else{<p class="result-count">{{ results().length }} kết quả</p><div class="results">@for(result of results();track result.id){<a [routerLink]="result.path"><div><span class="badge">{{ result.level }}</span><span>{{ result.category }} / {{ result.technology }}</span></div><h2>{{ result.title }}</h2><p>{{ result.excerpt }}</p><small>Độ liên quan {{ result.score }}</small></a>}</div>}</div>
+<div class="page search-page">
+  <header class="page-header">
+    <span class="eyebrow">FULL-TEXT SEARCH</span>
+    <h1>Tìm kiến thức</h1>
+    <p>Tìm trong nội dung Markdown theo công nghệ, cấp độ và loại kiến thức.</p>
+  </header>
+
+  <form (ngSubmit)="submit()">
+    <div class="search-row">
+      <label class="sr-only" for="search-input">Từ khóa</label>
+      <input
+        id="search-input"
+        name="q"
+        [(ngModel)]="query"
+        placeholder="Ví dụ: N+1, happens-before, cache stampede…"
+      />
+      <button class="button primary" type="submit">Tìm</button>
+    </div>
+    <div class="search-filters" aria-label="Bộ lọc tìm kiếm">
+      <label>
+        <span>Công nghệ</span>
+        <select name="technology" [(ngModel)]="selectedTechnology">
+          <option value="all">Tất cả</option>
+          @for (item of facets().technologies; track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Cấp độ</span>
+        <select name="level" [(ngModel)]="selectedLevel">
+          <option value="all">Tất cả</option>
+          @for (item of facets().levels; track item) {
+            <option [value]="item">{{ levelLabels[item] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Loại nội dung</span>
+        <select name="contentType" [(ngModel)]="selectedContentType">
+          <option value="all">Tất cả</option>
+          @for (item of facets().contentTypes; track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  </form>
+
+  @if (error()) {
+    <div class="empty-state" role="alert">{{ error() }}</div>
+  } @else if (searching()) {
+    <p class="muted" role="status">Đang tìm…</p>
+  } @else if (hasCriteria() && !results().length) {
+    <div class="empty-state">
+      <h2>Không có kết quả phù hợp</h2>
+      <p>Thử một thuật ngữ rộng hơn hoặc bỏ bớt bộ lọc.</p>
+    </div>
+  } @else if (hasCriteria()) {
+    <p class="result-count">{{ results().length }} kết quả</p>
+    <div class="results">
+      @for (result of results(); track result.id) {
+        <a [routerLink]="result.path">
+          <div>
+            <span class="badge">{{ levelLabels[result.level] }}</span>
+            <span>{{ result.technology }} · {{ result.contentType }}</span>
+          </div>
+          <h2>{{ result.title }}</h2>
+          <p>{{ result.excerpt }}</p>
+          <small>Độ liên quan {{ result.score }}</small>
+        </a>
+      }
+    </div>
+  }
+</div>

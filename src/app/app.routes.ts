@@ -17,6 +17,7 @@ export const routes: Routes = [
       { path: 'roadmap/:id', loadComponent: () => import('./features/roadmap/roadmap').then((m) => m.Roadmap) },
       { path: 'interview', loadComponent: () => import('./features/interview/interview').then((m) => m.Interview) },
       { path: 'interview/:category', loadComponent: () => import('./features/interview/interview').then((m) => m.Interview) },
+      { path: 'flashcards', loadComponent: () => import('./features/flashcards/flashcards').then((m) => m.Flashcards) },
       { path: 'bookmarks', loadComponent: () => import('./features/bookmarks/bookmarks').then((m) => m.Bookmarks) },
       { path: 'settings', loadComponent: () => import('./features/settings/settings').then((m) => m.Settings) },
       { path: '**', loadComponent: () => import('./features/not-found/not-found').then((m) => m.NotFound) },

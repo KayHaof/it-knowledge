@@ -3,6 +3,11 @@ import { LearningData, ProgressStatus, ThemePreference } from '../models/learnin
 import { StorageService } from '../storage/storage.service';
 
 const STORAGE_KEY = 'it-learning-platform:v1:data';
+const INTERVIEW_ID_MIGRATIONS: Readonly<Record<string, string>> = {
+  'system-design-job-scheduler': 'interview-system-design-job-scheduler',
+  'system-design-payment-ledger': 'interview-system-design-payment-ledger',
+  'system-design-search-autocomplete': 'interview-system-design-search-autocomplete',
+};
 const emptyData = (): LearningData => ({
   version: 1, progress: {}, bookmarks: [], recent: [], masteredQuestions: [], reviewQuestions: [], settings: { theme: 'system' },
 });
@@ -11,7 +16,9 @@ const emptyData = (): LearningData => ({
 export class LearningStateService {
   private readonly storage = inject(StorageService);
 
-  private readonly state = signal(this.storage.read<LearningData>(STORAGE_KEY, emptyData()));
+  private readonly state = signal(
+    migrateLearningData(this.storage.read<LearningData>(STORAGE_KEY, emptyData())),
+  );
   readonly data = this.state.asReadonly();
   readonly completedCount = computed(() => Object.values(this.state().progress).filter((value) => value === 'completed').length);
   status(id: string): ProgressStatus { return this.state().progress[id] ?? 'not-started'; }
@@ -28,7 +35,7 @@ export class LearningStateService {
     try {
       const parsed = JSON.parse(raw) as Partial<LearningData>;
       if (parsed.version !== 1 || !parsed.progress || !parsed.settings) return false;
-      this.state.set({ ...emptyData(), ...parsed } as LearningData); this.persist(); return true;
+      this.state.set(migrateLearningData({ ...emptyData(), ...parsed } as LearningData)); this.persist(); return true;
     } catch { return false; }
   }
   reset(kind: 'progress' | 'bookmarks' | 'all'): void {
@@ -41,3 +48,14 @@ export class LearningStateService {
   private persist(): void { this.storage.write(STORAGE_KEY, this.state()); }
 }
 function toggle(values: string[], id: string): string[] { return values.includes(id) ? values.filter((value) => value !== id) : [...values, id]; }
+
+function migrateLearningData(data: LearningData): LearningData {
+  const migrateIds = (values: string[]) => [
+    ...new Set(values.map((id) => INTERVIEW_ID_MIGRATIONS[id] ?? id)),
+  ];
+  return {
+    ...data,
+    masteredQuestions: migrateIds(data.masteredQuestions ?? []),
+    reviewQuestions: migrateIds(data.reviewQuestions ?? []),
+  };
+}

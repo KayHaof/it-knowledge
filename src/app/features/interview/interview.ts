@@ -9,7 +9,16 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { InterviewQuestion } from '../../core/models/content.models';
+import {
+  EvaluableInterviewQuestion,
+  InterviewEvaluation,
+  InterviewHistoryEntry,
+} from '../../core/interview/interview-evaluation.models';
+import { InterviewHistoryService } from '../../core/interview/interview-history.service';
+import {
+  normalizeInterviewText,
+  RuleBasedInterviewEvaluator,
+} from '../../core/interview/rule-based-interview-evaluator';
 import { ContentRepository } from '../../core/services/content-repository';
 import { LearningStateService } from '../../core/services/learning-state.service';
 
@@ -20,8 +29,14 @@ const DIFFICULTIES: readonly InterviewFilterOption[] = [
   { value: 'middle', label: 'Middle', count: 0 },
   { value: 'senior', label: 'Senior', count: 0 },
   { value: 'system-design', label: 'System Design', count: 0 },
-  { value: 'beginner', label: 'Beginner', count: 0 },
 ];
+
+const DIFFICULTY_LABELS: Readonly<Record<EvaluableInterviewQuestion['difficulty'], string>> = {
+  junior: 'Junior',
+  middle: 'Middle',
+  senior: 'Senior',
+  'system-design': 'System Design',
+};
 
 @Component({
   selector: 'app-interview',
@@ -33,15 +48,25 @@ const DIFFICULTIES: readonly InterviewFilterOption[] = [
 export class Interview implements OnInit {
   private readonly repository = inject(ContentRepository);
   private readonly router = inject(Router);
+  private readonly evaluator = inject(RuleBasedInterviewEvaluator);
+  private readonly history = inject(InterviewHistoryService);
   protected readonly state = inject(LearningStateService);
 
   readonly category = input('all');
   readonly difficulty = input('all');
-  protected readonly questions = signal<InterviewQuestion[]>([]);
+  readonly questionId = input<string | undefined>('');
+  protected readonly questions = signal<EvaluableInterviewQuestion[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
   protected readonly index = signal(0);
   protected readonly answerVisible = signal(false);
+  protected readonly activeFollowUp = signal<string | null>(null);
+  protected readonly draftAnswer = signal('');
+  protected readonly evaluation = signal<InterviewEvaluation | null>(null);
+  protected readonly evaluating = signal(false);
+  protected readonly evaluationError = signal('');
+  protected readonly confirmingClearHistory = signal(false);
+  protected readonly historyEntries = this.history.entries;
 
   protected readonly categoryOptions = computed<InterviewFilterOption[]>(() => {
     const difficulty = this.normalizedDifficulty();
@@ -81,14 +106,22 @@ export class Interview implements OnInit {
     effect(() => {
       this.category();
       this.difficulty();
-      this.index.set(0);
-      this.answerVisible.set(false);
+      const requestedQuestionId = (this.questionId() ?? '').trim();
+      const requestedIndex = requestedQuestionId
+        ? this.filtered().findIndex((question) => question.id === requestedQuestionId)
+        : -1;
+      this.index.set(requestedIndex >= 0 ? requestedIndex : 0);
+    });
+    effect(() => {
+      if (this.current() || !this.loading()) this.resetAttempt();
     });
   }
 
   async ngOnInit(): Promise<void> {
     try {
-      this.questions.set(await this.repository.interviewQuestions());
+      this.questions.set(
+        (await this.repository.interviewQuestions()) as EvaluableInterviewQuestion[],
+      );
     } catch {
       this.error.set(this.repository.loadError() || 'Không thể tải bộ câu hỏi phỏng vấn.');
     } finally {
@@ -108,13 +141,112 @@ export class Interview implements OnInit {
     const total = this.filtered().length;
     if (!total) return;
     this.index.set((this.index() + delta + total) % total);
-    this.answerVisible.set(false);
+    this.resetAttempt();
   }
 
   protected random(): void {
     const total = this.filtered().length;
     if (total) this.index.set(Math.floor(Math.random() * total));
-    this.answerVisible.set(false);
+    this.resetAttempt();
+  }
+
+  protected updateDraft(event: Event): void {
+    this.draftAnswer.set((event.target as HTMLTextAreaElement).value);
+    if (this.evaluation()) {
+      this.evaluation.set(null);
+      this.answerVisible.set(false);
+    }
+    this.evaluationError.set('');
+  }
+
+  protected async submitAnswer(): Promise<void> {
+    const question = this.current();
+    const answer = this.draftAnswer().trim();
+    if (!question || !answer || this.evaluating() || this.activeFollowUp()) return;
+
+    this.evaluating.set(true);
+    this.evaluationError.set('');
+    try {
+      const evaluation = await this.evaluator.evaluate(question, answer);
+      if (this.current()?.id !== question.id) return;
+      this.evaluation.set(evaluation);
+      this.answerVisible.set(true);
+      this.history.add(question, answer, evaluation);
+    } catch {
+      this.evaluationError.set('Không thể đánh giá câu trả lời lúc này.');
+    } finally {
+      this.evaluating.set(false);
+    }
+  }
+
+  protected requestClearHistory(): void {
+    this.confirmingClearHistory.set(true);
+  }
+
+  protected cancelClearHistory(): void {
+    this.confirmingClearHistory.set(false);
+  }
+
+  protected clearHistory(): void {
+    this.history.clear();
+    this.confirmingClearHistory.set(false);
+  }
+
+  protected detailedAnswer(question: EvaluableInterviewQuestion): string {
+    return question.answerDetailed || question.answer2m || '';
+  }
+
+  protected tradeoffsText(question: EvaluableInterviewQuestion): string {
+    return Array.isArray(question.tradeoffs)
+      ? question.tradeoffs.join(' ')
+      : question.tradeoffs ?? '';
+  }
+
+  protected relatedLessonIds(question: EvaluableInterviewQuestion): string[] {
+    return question.relatedLessons ?? [];
+  }
+
+  protected relatedLessonLinks(
+    question: EvaluableInterviewQuestion,
+  ): { id: string; title: string; path: string }[] {
+    return question.relatedLessonLinks ?? [];
+  }
+
+  protected followUpTarget(
+    followUp: string,
+    currentQuestion: EvaluableInterviewQuestion,
+  ): EvaluableInterviewQuestion | undefined {
+    return findFollowUpQuestion(followUp, this.questions(), currentQuestion);
+  }
+
+  protected followUpQueryParams(question: EvaluableInterviewQuestion): Record<string, string> {
+    return {
+      category: question.category.toLowerCase(),
+      difficulty: question.difficulty,
+      questionId: question.id,
+    };
+  }
+
+  protected practiceFollowUp(followUp: string): void {
+    this.resetAttempt();
+    this.activeFollowUp.set(followUp);
+  }
+
+  protected returnToMainQuestion(): void {
+    this.resetAttempt();
+  }
+
+  protected difficultyLabel(difficulty: EvaluableInterviewQuestion['difficulty']): string {
+    return DIFFICULTY_LABELS[difficulty];
+  }
+
+  protected formatTimestamp(entry: InterviewHistoryEntry): string {
+    const date = new Date(entry.timestamp);
+    if (Number.isNaN(date.getTime())) return entry.timestamp;
+    return new Intl.DateTimeFormat('vi-VN', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(date);
   }
 
   private navigateFilters(category: string, difficulty: string): void {
@@ -122,6 +254,7 @@ export class Interview implements OnInit {
       queryParams: {
         category: category === 'all' ? null : category,
         difficulty: difficulty === 'all' ? null : difficulty,
+        questionId: null,
       },
       queryParamsHandling: 'merge',
     });
@@ -136,4 +269,28 @@ export class Interview implements OnInit {
     const value = (this.difficulty() ?? 'all').trim().toLowerCase();
     return value === 'all' || DIFFICULTIES.some((option) => option.value === value) ? value : 'all';
   }
+
+  private resetAttempt(): void {
+    this.activeFollowUp.set(null);
+    this.draftAnswer.set('');
+    this.evaluation.set(null);
+    this.evaluationError.set('');
+    this.evaluating.set(false);
+    this.answerVisible.set(false);
+  }
+}
+
+export function findFollowUpQuestion(
+  followUp: string,
+  questions: readonly EvaluableInterviewQuestion[],
+  currentQuestion?: EvaluableInterviewQuestion,
+): EvaluableInterviewQuestion | undefined {
+  const normalizedFollowUp = normalizeInterviewText(followUp);
+  if (!normalizedFollowUp) return undefined;
+
+  const candidates = questions.filter((question) => question.id !== currentQuestion?.id);
+  const exact = candidates.find(
+    (question) => normalizeInterviewText(question.question) === normalizedFollowUp,
+  );
+  return exact;
 }

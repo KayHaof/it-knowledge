@@ -1,213 +1,60 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
+#!/usr/bin/env node
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
+import { ARTIFACT_FILES } from './config.mjs';
+import { compileKnowledge } from './compilers/compile-content.mjs';
+import { writeGeneratedArtifacts } from './generators/artifacts.mjs';
+import { checkSourceLinks } from './link-checker.mjs';
 
-const root = process.cwd();
-const contentRoot = path.join(root, 'content');
-const outputRoot = path.join(root, 'public', 'generated');
-const required = ['id','slug','title','description','category','technology','level','estimatedMinutes','tags','prerequisites','learningObjectives','lastReviewed','sources'];
-const levels = new Set(['beginner','intermediate','advanced','senior']);
-const interviewDifficulties = new Set(['beginner','junior','middle','senior','system-design']);
-const interviewCategories = new Set(['Java','Spring','JPA/Hibernate','SQL','PostgreSQL','MySQL','Oracle','Redis','Kafka','Microservices','Distributed Systems','WebSocket','Networking','Security','Kubernetes','System Design','Angular','MongoDB','Docker','CI/CD','Observability','Performance','Architecture','Testing','Project Experience','Engineering Fundamentals']);
-const sourceTypes = new Set(['official-documentation','official-api-reference','specification','standard','internet-standard','best-current-practice','primary-vendor','primary-vendor-guidance','primary-vendor-whitepaper','security-guidance','secondary']);
+export { parseFrontmatter } from './parsers/frontmatter.mjs';
+export { parseMarkdownDocument, scanStructuredBlocks } from './parsers/markdown.mjs';
+export { compileKnowledge } from './compilers/compile-content.mjs';
+export { writeGeneratedArtifacts } from './generators/artifacts.mjs';
 
-export function parseFrontmatter(source) {
-  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-  if (!match) throw new Error('Thiếu frontmatter được bao bởi ---');
-  const metadata = {};
-  for (const raw of match[1].split(/\r?\n/)) {
-    if (!raw.trim() || raw.trimStart().startsWith('#')) continue;
-    const separator = raw.indexOf(':');
-    if (separator < 1) throw new Error(`Metadata không hợp lệ: ${raw}`);
-    const key = raw.slice(0, separator).trim();
-    const value = raw.slice(separator + 1).trim();
-    metadata[key] = parseValue(value);
+export async function runContentPipeline(mode = 'build', overrides = {}) {
+  const supportedModes = new Set(['validate', 'build', 'index', 'stats', 'check-links']);
+  if (!supportedModes.has(mode)) {
+    throw new Error(`Unknown content command \`${mode}\`. Use: ${[...supportedModes].join(', ')}.`);
   }
-  return { metadata, markdown: match[2] };
+  const compilation = await compileKnowledge(overrides);
+  if (compilation.diagnostics.items.length) console.log(compilation.diagnostics.format());
+  if (compilation.diagnostics.hasErrors) {
+    throw new Error(`Content validation failed with ${compilation.diagnostics.errors.length} error(s).`);
+  }
+
+  if (mode === 'build') {
+    await writeGeneratedArtifacts(compilation, ARTIFACT_FILES);
+    console.log(`Generated ${ARTIFACT_FILES.length} deterministic artifacts.`);
+  } else if (mode === 'index') {
+    await writeGeneratedArtifacts(compilation, ['search-index.json']);
+    console.log(`Indexed ${compilation.artifacts['search-index.json'].length} lessons.`);
+  } else if (mode === 'stats') {
+    await writeGeneratedArtifacts(compilation, ['content-stats.json']);
+    console.log(JSON.stringify(compilation.artifacts['content-stats.json'], null, 2));
+  } else if (mode === 'check-links') {
+    const result = await checkSourceLinks(compilation, overrides.linkCheck);
+    for (const warning of result.warnings) console.warn(`[WARNING] link.blocked ${warning}`);
+    if (result.failures.length) {
+      throw new Error(`Link check failed (${result.failures.length}):\n${result.failures.join('\n')}`);
+    }
+    console.log(`Checked ${result.checked} unique source URLs.`);
+  } else {
+    console.log(
+      `Validated ${compilation.artifacts['lessons.json'].length} lessons, ` +
+        `${compilation.artifacts['interview.json'].length} interview questions, ` +
+        `${compilation.artifacts['flashcards.json'].length} flashcards and ` +
+        `${compilation.artifacts['roadmaps.json'].length} roadmaps.`,
+    );
+  }
+  return compilation;
 }
 
-function parseValue(value) {
-  if (!value) return '';
-  if (/^[\[{\"]/.test(value) || /^(true|false|null|-?\d+(\.\d+)?)$/.test(value)) {
-    try { return JSON.parse(value); } catch { throw new Error(`Giá trị metadata phải là JSON hợp lệ: ${value}`); }
-  }
-  return value;
-}
-
-export function parseMarkdown(markdown) {
-  const lines = markdown.replace(/\r/g, '').split('\n');
-  const blocks = []; const headings = [];
-  for (let i = 0; i < lines.length;) {
-    const line = lines[i];
-    if (!line.trim()) { i++; continue; }
-    const fence = line.match(/^```([^\s]*)\s*(?:title="([^"]+)")?\s*$/);
-    if (fence) {
-      const code = []; i++;
-      while (i < lines.length && !lines[i].startsWith('```')) code.push(lines[i++]);
-      if (i >= lines.length) throw new Error('Code fence chưa đóng');
-      i++;
-      if (fence[1] === 'mermaid') blocks.push({ type: 'diagram', code: code.join('\n') });
-      else blocks.push({ type: 'code', language: fence[1] || 'text', title: fence[2] || '', code: code.join('\n') });
-      continue;
-    }
-    const callout = line.match(/^:::(note|tip|info|warning|danger|best-practice|interview|production)\s*(.*)$/);
-    if (callout) {
-      const text = []; i++;
-      while (i < lines.length && lines[i].trim() !== ':::') text.push(lines[i++].trim());
-      if (i >= lines.length) throw new Error('Callout chưa đóng');
-      i++; blocks.push({ type:'callout', kind:callout[1], title:callout[2] || callout[1].replace('-', ' '), text:text.join(' ') }); continue;
-    }
-    const heading = line.match(/^(##|###)\s+(.+)$/);
-    if (heading) {
-      const text = heading[2].trim(); const id = uniqueSlug(text, headings.map((item) => item.id)); const level = heading[1].length;
-      const item = { id, text, level }; headings.push(item); blocks.push({ type:'heading', ...item }); i++; continue;
-    }
-    if (line.startsWith('|') && lines[i + 1]?.match(/^\|?[\s:|-]+\|/)) {
-      const headers = tableCells(line); i += 2; const rows = [];
-      while (i < lines.length && lines[i].startsWith('|')) rows.push(tableCells(lines[i++]));
-      blocks.push({ type:'table', headers, rows }); continue;
-    }
-    const list = line.match(/^\s*(\d+\.|[-*])\s+(.+)$/);
-    if (list) {
-      const ordered = list[1].endsWith('.'); const items = [];
-      while (i < lines.length) { const item = lines[i].match(/^\s*(\d+\.|[-*])\s+(.+)$/); if (!item || item[1].endsWith('.') !== ordered) break; items.push(item[2].trim()); i++; }
-      blocks.push({ type:'list', ordered, items }); continue;
-    }
-    const paragraph = [line.trim()]; i++;
-    while (i < lines.length && lines[i].trim() && !isStructural(lines, i)) paragraph.push(lines[i++].trim());
-    blocks.push({ type:'paragraph', text:paragraph.join(' ') });
-  }
-  return { blocks, headings };
-}
-
-function isStructural(lines, index) { const value=lines[index]; return /^(##|###|```|:::|\s*(\d+\.|[-*])\s+)/.test(value) || (value.startsWith('|') && lines[index+1]?.match(/^\|?[\s:|-]+\|/)); }
-function tableCells(line) { return line.replace(/^\||\|$/g,'').split('|').map((cell)=>cell.trim()); }
-function slugify(value) { return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
-function uniqueSlug(text, used) { const base=slugify(text); let id=base; let index=2; while(used.includes(id)) id=`${base}-${index++}`; return id; }
-
-async function walk(directory) {
-  const entries = await fs.readdir(directory, { withFileTypes:true }); const files=[];
-  for (const entry of entries) { if (entry.name === 'interview' || entry.name.endsWith('.json')) continue; const target=path.join(directory,entry.name); if(entry.isDirectory())files.push(...await walk(target)); else if(entry.name.endsWith('.md'))files.push(target); }
-  return files;
-}
-
-async function loadLessons() {
-  const registry = JSON.parse(await fs.readFile(path.join(root,'content-sources','official-sources.json'),'utf8'));
-  const domains = registry.flatMap((item)=>item.domains);
-  const files = await walk(contentRoot); const lessons=[]; const errors=[];
-  for (const file of files) {
-    try {
-      const { metadata, markdown } = parseFrontmatter(await fs.readFile(file,'utf8'));
-      for (const key of required) if (metadata[key] === undefined || metadata[key] === '') errors.push(`${relative(file)}: thiếu ${key}`);
-      if (!levels.has(metadata.level)) errors.push(`${relative(file)}: level không hợp lệ ${metadata.level}`);
-      if (!Array.isArray(metadata.sources) || !metadata.sources.length) errors.push(`${relative(file)}: sources phải là mảng không rỗng`);
-      for (const source of metadata.sources ?? []) {
-        try { const host=new URL(source.url).hostname; if(!domains.some((domain)=>host===domain||host.endsWith(`.${domain}`))) errors.push(`${relative(file)}: source ngoài whitelist ${host}`); }
-        catch { errors.push(`${relative(file)}: URL không hợp lệ ${source.url}`); }
-        if(source.type&&!sourceTypes.has(source.type))errors.push(`${relative(file)}: source type không hợp lệ ${source.type}`);
-      }
-      const { blocks, headings } = parseMarkdown(markdown);
-      const pathName = metadata.category === 'system-design' ? `/system-design/${metadata.slug}` : metadata.category === 'architecture' ? `/architecture/${metadata.slug}` : metadata.category === 'distributed-systems' ? `/distributed-systems/${metadata.slug}` : `/learn/${metadata.category}/${metadata.slug}`;
-      const searchText = blocks.map((block)=>block.text ?? block.code ?? block.items?.join(' ') ?? block.rows?.flat().join(' ') ?? '').join(' ');
-      lessons.push({ ...metadata, related:metadata.related??[], next:metadata.next??'', path:pathName, headings, blocks, searchText });
-    } catch (error) { errors.push(`${relative(file)}: ${error instanceof Error ? error.message : String(error)}`); }
-  }
-  const duplicate = (key) => lessons.map((item)=>item[key]).filter((value,index,all)=>all.indexOf(value)!==index);
-  for (const id of new Set(duplicate('id'))) errors.push(`duplicate id: ${id}`);
-  for (const slug of new Set(duplicate('slug'))) errors.push(`duplicate slug: ${slug}`);
-  const ids = new Set(lessons.map((item)=>item.id));
-  for (const lesson of lessons) for (const relation of [...lesson.prerequisites,...lesson.related,lesson.next].filter(Boolean)) if(!ids.has(relation)) errors.push(`${lesson.id}: relation không tồn tại ${relation}`);
-  for (const lesson of lessons) for (const source of lesson.sources ?? []) {
-    for (const field of ['title','url','organization','type','accessedAt']) if (!source[field]) errors.push(`${lesson.id}: source thiếu ${field}`);
-  }
-  await validateSupplemental(ids, new Set(lessons.map((item)=>item.path)), errors, domains);
-  if (errors.length) throw new Error(`Content validation thất bại:\n- ${errors.join('\n- ')}`);
-  return lessons.sort((a,b)=>a.category.localeCompare(b.category)||a.title.localeCompare(b.title));
-}
-
-async function validateSupplemental(lessonIds, lessonPaths, errors, domains) {
+const isEntryPoint = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+if (isEntryPoint) {
   try {
-    const questions=await loadInterviewQuestions();
-    const seen=new Set();
-    const questionTexts=new Set();
-    for(const question of questions){
-      for(const field of ['id','category','difficulty','question','answer30s','answer2m','production','wrongAnswer','followUps','relatedLesson']) if(!question[field])errors.push(`interview ${question.id??'?'}: thiếu ${field}`);
-      if(seen.has(question.id))errors.push(`interview duplicate id: ${question.id}`);seen.add(question.id);
-      if(!interviewCategories.has(question.category))errors.push(`interview ${question.id??'?'}: category không hợp lệ ${question.category}`);
-      if(!interviewDifficulties.has(question.difficulty))errors.push(`interview ${question.id??'?'}: difficulty không hợp lệ ${question.difficulty}`);
-      if(!Array.isArray(question.topics)||!question.topics.length)errors.push(`interview ${question.id??'?'}: topics phải là mảng không rỗng`);
-      if(!Array.isArray(question.followUps)||question.followUps.length<2||question.followUps.length>5)errors.push(`interview ${question.id??'?'}: followUps phải có 2-5 câu`);
-      const questionText=String(question.question??'').trim().toLocaleLowerCase();
-      if(questionTexts.has(questionText))errors.push(`interview duplicate question: ${question.id}`);questionTexts.add(questionText);
-      if(question.relatedLesson&&!lessonPaths.has(question.relatedLesson))errors.push(`interview ${question.id}: relatedLesson không tồn tại ${question.relatedLesson}`);
-      if(question.sources!==undefined&&!Array.isArray(question.sources))errors.push(`interview ${question.id}: sources phải là mảng`);
-      for(const source of question.sources??[]){
-        for(const field of ['title','url','organization','type','accessedAt'])if(!source[field])errors.push(`interview ${question.id}: source thiếu ${field}`);
-        try{const host=new URL(source.url).hostname;if(!domains.some((domain)=>host===domain||host.endsWith(`.${domain}`)))errors.push(`interview ${question.id}: source ngoài whitelist ${host}`);}
-        catch{errors.push(`interview ${question.id}: URL không hợp lệ ${source.url}`);}
-        if(source.type&&!sourceTypes.has(source.type))errors.push(`interview ${question.id}: source type không hợp lệ ${source.type}`);
-      }
-    }
-  }catch(error){errors.push(`content/interview/*.json: ${error instanceof Error?error.message:String(error)}`);}
-  try {
-    const roadmaps=JSON.parse(await fs.readFile(path.join(contentRoot,'roadmaps.json'),'utf8')); const seen=new Set();
-    for(const roadmap of roadmaps){
-      if(!roadmap.id||!roadmap.title||!roadmap.description||!Array.isArray(roadmap.steps)||!roadmap.steps.length)errors.push(`roadmap ${roadmap.id??'?'}: schema không hợp lệ`);
-      if(seen.has(roadmap.id))errors.push(`roadmap duplicate id: ${roadmap.id}`);seen.add(roadmap.id);
-      for(const step of roadmap.steps??[])if(!lessonIds.has(step.lessonId))errors.push(`roadmap ${roadmap.id}: lessonId không tồn tại ${step.lessonId}`);
-    }
-  }catch(error){errors.push(`content/roadmaps.json: ${error instanceof Error?error.message:String(error)}`);}
-}
-
-async function loadInterviewQuestions() {
-  const interviewRoot=path.join(contentRoot,'interview');
-  const files=(await fs.readdir(interviewRoot,{withFileTypes:true})).filter((entry)=>entry.isFile()&&entry.name.endsWith('.json')).map((entry)=>entry.name).sort();
-  const questions=[];
-  for(const file of files){
-    const parsed=JSON.parse(await fs.readFile(path.join(interviewRoot,file),'utf8'));
-    if(!Array.isArray(parsed))throw new Error(`${file}: interview data phải là mảng`);
-    questions.push(...parsed);
+    await runContentPipeline(process.argv[2] ?? 'build');
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
   }
-  return questions;
 }
-
-async function build() {
-  const lessons=await loadLessons(); await fs.mkdir(outputRoot,{recursive:true});
-  await fs.writeFile(path.join(outputRoot,'lessons.json'),JSON.stringify(lessons));
-  const index=lessons.map(({id,slug,title,description,category,technology,level,tags,headings,searchText,path})=>({id,slug,title,description,category,technology,level,tags,headings:headings.map((heading)=>heading.text),content:searchText,path}));
-  await fs.writeFile(path.join(outputRoot,'search-index.json'),JSON.stringify(index));
-  const questions=await loadInterviewQuestions();
-  const lessonByPath=new Map(lessons.map((lesson)=>[lesson.path,lesson]));
-  const sourcedQuestions=questions.map((question)=>({
-    ...question,
-    sources:question.sources?.length?question.sources:(lessonByPath.get(question.relatedLesson)?.sources??[]),
-  }));
-  await fs.writeFile(path.join(outputRoot,'interview.json'),JSON.stringify(sourcedQuestions));
-  await fs.copyFile(path.join(contentRoot,'roadmaps.json'),path.join(outputRoot,'roadmaps.json'));
-  console.log(`Generated ${lessons.length} lessons and ${index.length} search documents.`);
-}
-
-async function checkLinks() {
-  const lessons=await loadLessons();
-  const questions=await loadInterviewQuestions();
-  const urls=[...new Set([
-    ...lessons.flatMap((item)=>item.sources.map((source)=>source.url)),
-    ...questions.flatMap((item)=>(item.sources??[]).map((source)=>source.url)),
-  ])];
-  const failures=[]; const blocked=[];
-  for (const url of urls) {
-    try {
-      let response=await fetch(url,{method:'HEAD',redirect:'follow',signal:AbortSignal.timeout(12000)});
-      if(!response.ok&&[403,405].includes(response.status))response=await fetch(url,{method:'GET',redirect:'follow',headers:{'user-agent':'Mozilla/5.0 IT-Knowledge-Link-Checker'},signal:AbortSignal.timeout(12000)});
-      if(response.status===403)blocked.push(url); else if(!response.ok)failures.push(`${response.status} ${url}`);
-    } catch(error){failures.push(`${error instanceof Error?error.message:String(error)} ${url}`);}
-  }
-  if(failures.length) throw new Error(`Link check có ${failures.length} lỗi:\n${failures.join('\n')}`);
-  if(blocked.length)console.warn(`Verified metadata nhưng host chặn automated request (403):\n${blocked.join('\n')}`);
-  console.log(`Checked ${urls.length} source links.`);
-}
-function relative(file){return path.relative(root,file).replaceAll('\\','/');}
-
-const mode=process.argv[2]??'build';
-if(mode==='validate'){const lessons=await loadLessons();console.log(`Validated ${lessons.length} lessons: metadata, relations and source domains are valid.`);}
-else if(mode==='check-links')await checkLinks(); else await build();

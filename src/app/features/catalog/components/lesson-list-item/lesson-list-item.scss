@@ -136,7 +136,7 @@
   text-transform: uppercase;
 }
 
-.level-badge[data-level='senior'] {
+.level-badge[data-level='extended'] {
   border-color: color-mix(in srgb, var(--warning) 32%, var(--border));
   color: var(--warning);
 }

@@ -8,4 +8,4 @@ import { LessonCard } from '../../shared/components/lesson-card/lesson-card';
 export class Bookmarks implements OnInit {
 private readonly repository = inject(ContentRepository);
 protected readonly state = inject(LearningStateService);
-private readonly lessons=signal<Lesson[]>([]);protected readonly saved=computed(()=>this.lessons().filter((item)=>this.state.data().bookmarks.includes(item.id)));async ngOnInit():Promise<void>{this.lessons.set(await this.repository.lessons());}}
+private readonly lessons=signal<Lesson[]>([]);protected readonly loading=signal(true);protected readonly error=signal('');protected readonly saved=computed(()=>this.lessons().filter((item)=>this.state.data().bookmarks.includes(item.id)));async ngOnInit():Promise<void>{try{this.lessons.set(await this.repository.lessons());}catch{this.error.set(this.repository.loadError()||'Không thể tải danh sách bài học. Vui lòng thử tải lại trang.');}finally{this.loading.set(false);}}}

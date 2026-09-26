@@ -42,15 +42,14 @@ describe('catalog utilities', () => {
     const levelOptions = buildLevelOptions(lessons, 'jpa', facets);
     expect(levelOptions.map((option) => [option.value, option.count])).toEqual([
       ['all', 2],
-      ['beginner', 0],
-      ['intermediate', 0],
+      ['basic', 0],
       ['advanced', 1],
-      ['senior', 1],
+      ['extended', 1],
     ]);
 
     const technologyOptions = buildTechnologyOptions(lessons, 'advanced', facets);
     expect(technologyOptions.find((option) => option.value === 'jpa')?.count).toBe(1);
-    expect(technologyOptions.find((option) => option.value === 'spring')?.count).toBe(1);
+    expect(technologyOptions.find((option) => option.value === 'spring')?.count).toBe(2);
   });
 
   it('falls back to all for invalid query values', () => {
@@ -66,7 +65,7 @@ describe('catalog utilities', () => {
     const prerequisite = createLesson({
       id: 'foundation',
       title: 'Foundation',
-      level: 'beginner',
+      level: 'basic',
       technology: 'Java',
     });
     const dependent = createLesson({
@@ -113,16 +112,16 @@ describe('catalog utilities', () => {
 
 function backendLessons(): Lesson[] {
   return [
-    createLesson({ id: 'java-object', title: 'Java Object', level: 'beginner', technology: 'Java', tags: ['java'] }),
-    createLesson({ id: 'java-collections', title: 'Java Collections', level: 'intermediate', technology: 'Java', tags: ['java'] }),
-    createLesson({ id: 'jvm-memory', title: 'JVM Memory', level: 'intermediate', technology: 'Java / JVM', tags: ['java', 'jvm'] }),
-    createLesson({ id: 'jvm-profile', title: 'JVM Profile', level: 'senior', technology: 'Java / JVM', tags: ['java', 'jvm'] }),
-    createLesson({ id: 'spring-core', title: 'Spring Core', level: 'intermediate', technology: 'Spring', tags: ['spring'], prerequisites: ['java-object'] }),
+    createLesson({ id: 'java-object', title: 'Java Object', level: 'basic', technology: 'Java', tags: ['java'] }),
+    createLesson({ id: 'java-collections', title: 'Java Collections', level: 'basic', technology: 'Java', tags: ['java'] }),
+    createLesson({ id: 'jvm-memory', title: 'JVM Memory', level: 'basic', technology: 'Java / JVM', tags: ['java', 'jvm'] }),
+    createLesson({ id: 'jvm-profile', title: 'JVM Profile', level: 'extended', technology: 'Java / JVM', tags: ['java', 'jvm'] }),
+    createLesson({ id: 'spring-core', title: 'Spring Core', level: 'basic', technology: 'Spring', tags: ['spring'], prerequisites: ['java-object'] }),
     createLesson({ id: 'spring-boot', title: 'Spring Boot', level: 'advanced', technology: 'Spring Boot', tags: ['spring-boot'], prerequisites: ['spring-core'] }),
     createLesson({ id: 'jpa-context', title: 'JPA Context', level: 'advanced', technology: 'JPA / Hibernate', tags: ['jpa', 'hibernate'], prerequisites: ['spring-core'] }),
-    createLesson({ id: 'jpa-locking', title: 'JPA Locking', level: 'senior', technology: 'Spring Data JPA / Hibernate', tags: ['spring', 'jpa', 'hibernate'], prerequisites: ['jpa-context'] }),
-    createLesson({ id: 'java-errors', title: 'Java Errors', level: 'beginner', technology: 'Java', tags: ['java'] }),
-    createLesson({ id: 'spring-testing', title: 'Spring Testing', level: 'intermediate', technology: 'Spring Boot', tags: ['spring-boot'], prerequisites: ['spring-core'] }),
+    createLesson({ id: 'jpa-locking', title: 'JPA Locking', level: 'extended', technology: 'Spring Data JPA / Hibernate', tags: ['spring', 'jpa', 'hibernate'], prerequisites: ['jpa-context'] }),
+    createLesson({ id: 'java-errors', title: 'Java Errors', level: 'basic', technology: 'Java', tags: ['java'] }),
+    createLesson({ id: 'spring-testing', title: 'Spring Testing', level: 'advanced', technology: 'Spring Boot', tags: ['spring-boot'], prerequisites: ['spring-core'] }),
   ];
 }
 
@@ -134,9 +133,12 @@ function createLesson(
     slug: overrides.id,
     title: overrides.title,
     description: overrides.description ?? '',
+    domain: overrides.domain ?? 'backend',
     category: overrides.category ?? 'backend',
     technology: overrides.technology,
     level: overrides.level,
+    contentType: overrides.contentType ?? 'core',
+    order: overrides.order ?? 10,
     estimatedMinutes: overrides.estimatedMinutes ?? 55,
     tags: overrides.tags ?? [],
     prerequisites: overrides.prerequisites ?? [],

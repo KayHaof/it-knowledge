@@ -120,7 +120,9 @@ export class Catalog implements OnInit {
       this.lessons.set(lessons);
       this.roadmaps.set(roadmaps);
     } catch {
-      this.loadError.set('Không thể tải kho bài học. Hãy chạy lại bước tạo content index.');
+      this.loadError.set(
+        this.repository.loadError() || 'Không thể tải kho bài học. Vui lòng thử tải lại trang.',
+      );
     } finally {
       this.loading.set(false);
     }
